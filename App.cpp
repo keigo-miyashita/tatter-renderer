@@ -24,26 +24,28 @@ void App::OnStart()
 	std::map<string, AttachmentInfo> geometryAttachmentNameToInfo;
 	AttachmentInfo gbuffer0; // BaseColor + Metalness
 	gbuffer0.attachmentDesc
-		.setFormat(swapchain_->GetSurfaceFormat())
+		.setFormat(vk::Format::eR8G8B8A8Unorm)
 		.setSamples(vk::SampleCountFlagBits::e1)
 		.setLoadOp(vk::AttachmentLoadOp::eClear)
 		.setStoreOp(vk::AttachmentStoreOp::eStore)
 		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
 		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
 		.setInitialLayout(vk::ImageLayout::eUndefined)
-		.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+		.setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 	gbuffer0.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
 	geometryAttachmentNameToInfo["BaseColorMetallness"] = gbuffer0;
 
-	//AttachmentInfo gbuffer1; // Normal + Roughness
-	//gbuffer1 = gbuffer0;
-	//gbuffer1.attachmentDesc.format = vk::Format::eR16G16B16A16Sfloat;
-	//gbuffer1.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	AttachmentInfo gbuffer1; // Normal + Roughness
+	gbuffer1 = gbuffer0;
+	gbuffer1.attachmentDesc.format = vk::Format::eR16G16B16A16Sfloat;
+	gbuffer1.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	geometryAttachmentNameToInfo["NormalRoughness"] = gbuffer1;
 
-	//AttachmentInfo gbuffer2; // Emissive + AO
-	//gbuffer2 = gbuffer0;
-	//gbuffer2.attachmentDesc.format = vk::Format::eR8G8B8A8Unorm;
-	//gbuffer2.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	AttachmentInfo gbuffer2; // Emissive + AO
+	gbuffer2 = gbuffer0;
+	gbuffer2.attachmentDesc.format = vk::Format::eR8G8B8A8Unorm;
+	gbuffer2.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	geometryAttachmentNameToInfo["EmissiveAO"] = gbuffer2;
 
 	AttachmentInfo depthAttachment;
 	depthAttachment.attachmentDesc
@@ -54,12 +56,12 @@ void App::OnStart()
 		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
 		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
 		.setInitialLayout(vk::ImageLayout::eUndefined)
-		.setFinalLayout(vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal);
+		.setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 	depthAttachment.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
 	geometryAttachmentNameToInfo["Depth"] = depthAttachment;
 
 	SubPassInfo geometrySubpass;
-	geometrySubpass.attachmentInfos = {"BaseColorMetallness", "Depth"};
+	geometrySubpass.attachmentInfos = {"BaseColorMetallness", "NormalRoughness", "EmissiveAO",  "Depth"};
 	//geometrySubpass.attachmentInfos = { gbuffer0, /*&gbuffer1, &gbuffer2,*/ depthAttachment };
 
 	geometryRenderPass_ = device_.CreateRenderPass(
@@ -92,15 +94,14 @@ void App::OnStart()
 	geometryFrameBuffer_ = device_.CreateFrameBuffer(
 		geometryRenderPass_,
 		{
-			//{ gbufferFormats[0], vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, "BaseColorMetallness"},
-			//{ gbufferFormats[1], vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, "NormalRoughness"},
-			//{ gbufferFormats[2], vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, "EmissiveAO"},
+			{ gbufferFormats[0], vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, "BaseColorMetallness"},
+			{ gbufferFormats[1], vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, "NormalRoughness"},
+			{ gbufferFormats[2], vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, "EmissiveAO"},
 			{ vk::Format::eD32Sfloat, vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled, "Depth"}
 		},
 		swapchain_->GetWidth(),
 		swapchain_->GetHeight(),
-		swapchain_->GetInflightCount(),
-		swapchain_
+		swapchain_->GetInflightCount()
 	);
 
 	lightingFrameBuffer_ = device_.CreateFrameBuffer(
@@ -153,7 +154,7 @@ void App::OnStart()
 	lightPixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "lightingpass.shader", sqrp::ShaderType::Pixel);
 
 	//pipeline_ = device_.CreatePipeline(renderPass_, swapchain_, vertShader_, pixelShader_, descriptorSet_);
-	pipeline_ = device_.CreatePipeline(renderPass_, swapchain_, geomVertShader_, geomPixelShader_, descriptorSet_);
+	pipeline_ = device_.CreatePipeline(renderPass_, swapchain_, vertShader_, pixelShader_, descriptorSet_);
 	
 	geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
 	lightingDescriptorSets_.resize(swapchain_->GetInflightCount());
@@ -166,16 +167,16 @@ void App::OnStart()
 			}
 		);
 
-		/*lightingDescriptorSets_[i] = device_.CreateDescriptorSet({
+		lightingDescriptorSets_[i] = device_.CreateDescriptorSet({
 			{ geometryFrameBuffer_->GetAttachmentImage(0, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 			{ geometryFrameBuffer_->GetAttachmentImage(1, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 			{ geometryFrameBuffer_->GetAttachmentImage(2, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 			}
-		);*/
+		);
 	}
 
 	geometryPipeline_ = device_.CreatePipeline(geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_, geometryDescriptorSets_[0]);
-	//lightingPipeline_ = device_.CreatePipeline(lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_, lightingDescriptorSets_[0]);
+	lightingPipeline_ = device_.CreatePipeline(lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_, lightingDescriptorSets_[0]);
 }
 
 void App::OnUpdate()
@@ -233,17 +234,17 @@ void App::OnUpdate()
 	commandBuffer->TransitionLayout(geometryFrameBuffer_->GetAttachmentImage(1, infligtIndex), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 	commandBuffer->TransitionLayout(geometryFrameBuffer_->GetAttachmentImage(2, infligtIndex), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);*/
 
-	//commandBuffer->BeginRenderPass(lightingRenderPass_, lightingFrameBuffer_, swapchain_);
+	commandBuffer->BeginRenderPass(lightingRenderPass_, lightingFrameBuffer_, swapchain_);
 
-	//commandBuffer->SetViewport(swapchain_->GetWidth(), swapchain_->GetHeight());
-	//commandBuffer->SetScissor(swapchain_->GetWidth(), swapchain_->GetHeight());
-	//commandBuffer->BindPipeline(lightingPipeline_, vk::PipelineBindPoint::eGraphics);
-	//commandBuffer->BindDescriptorSet(lightingPipeline_, lightingDescriptorSets_[infligtIndex], vk::PipelineBindPoint::eGraphics);
-	////commandBuffer->BindMeshBuffer(mesh_);
-	////commandBuffer->DrawMesh(mesh_);
-	//commandBuffer->Draw(3, 1); // Fullscreen Triangle
+	commandBuffer->SetViewport(swapchain_->GetWidth(), swapchain_->GetHeight());
+	commandBuffer->SetScissor(swapchain_->GetWidth(), swapchain_->GetHeight());
+	commandBuffer->BindPipeline(lightingPipeline_, vk::PipelineBindPoint::eGraphics);
+	commandBuffer->BindDescriptorSet(lightingPipeline_, lightingDescriptorSets_[infligtIndex], vk::PipelineBindPoint::eGraphics);
+	//commandBuffer->BindMeshBuffer(mesh_);
+	//commandBuffer->DrawMesh(mesh_);
+	commandBuffer->Draw(3, 1); // Fullscreen Triangle
 
-	//commandBuffer->EndRenderPass();
+	commandBuffer->EndRenderPass();
 
 	commandBuffer->End();
 
