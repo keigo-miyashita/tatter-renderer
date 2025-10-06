@@ -17,3 +17,8 @@ target_include_directories(
 	${PROJECT_NAME} PUBLIC
 	sqrap-vk/inc
 )
+
+set(SHADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shader/")
+add_compile_definitions(SHADER_DIR="${SHADER_DIR}")
+set(MODEL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/model/")
+add_compile_definitions(MODEL_DIR="${MODEL_DIR}")

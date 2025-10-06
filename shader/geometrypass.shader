@@ -53,17 +53,23 @@ layout(location = 1) in vec4 fNormal;
 layout(location = 2) in vec4 fTangent;
 layout(location = 3) in vec2 fUV;
 
-layout(location = 0) out vec4 outColor;
+layout(location = 0) out vec4 outBaseColorMetallness;   // Base Color + Metalness
+// layout(location = 1) out vec4 outNormalRoughness;   // gbuffer1
+// layout(location = 2) out vec4 outEmissiveAO;    // gbuffer2
 
 void main()
 {
-	vec3 N = normalize(fNormal.xyz);
-	vec3 L = normalize(light.lightPos.xyz);
+	// アルベドはテクスチャ参照
+    outBaseColorMetallness = vec4(color.baseColor.rgb, 1.0f);
+    // outBaseColorMetallness = vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    // outBaseColorMetallness = vec4(1.0f, 0.0f, 0.0f, 1.0f);
 
-	float diff = max(dot(N, L), 0.0);
+    // 法線を[0,1]に変換して格納
+    // outNormalRoughness = vec4(normalize(fNormal.rgb) * 0.5 + 0.5, 1.0);
+    // outNormalRoughness = vec4(1.0f, 0.0f, 0.0f, 1.0f);
 
-	vec3 color = color.baseColor.rgb * light.lightColor.rgb * diff;
-
-	outColor = vec4(color, 1.0);
+    // 追加情報（例: roughness, metallic）
+    // outEmissiveAO = vec4(0.0, 0.0, 0.0, 1.0);
+    // outEmissiveAO = vec4(1.0f, 0.0f, 0.0f, 1.0f);
 }
 #endif

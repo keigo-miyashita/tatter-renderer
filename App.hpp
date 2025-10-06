@@ -14,9 +14,14 @@ class App : public sqrp::Application
 private:
 	sqrp::Device device_;
 	sqrp::Compiler compiler_;
+
 	sqrp::SwapchainHandle swapchain_;
 	sqrp::RenderPassHandle renderPass_;
+	sqrp::RenderPassHandle geometryRenderPass_;
+	sqrp::RenderPassHandle lightingRenderPass_;
 	sqrp::FrameBufferHandle	frameBuffer_;
+	sqrp::FrameBufferHandle	geometryFrameBuffer_;
+	sqrp::FrameBufferHandle	lightingFrameBuffer_;
 	sqrp::MeshHandle mesh_;
 
 	sqrp::Camera camera_;
@@ -30,9 +35,18 @@ private:
 
 	sqrp::ShaderHandle vertShader_;
 	sqrp::ShaderHandle pixelShader_;
+	sqrp::ShaderHandle geomVertShader_;
+	sqrp::ShaderHandle geomPixelShader_;
+	sqrp::ShaderHandle lightVertShader_;
+	sqrp::ShaderHandle lightPixelShader_;
 
 	sqrp::DescriptorSetHandle descriptorSet_;
 	sqrp::PipelineHandle pipeline_;
+
+	std::vector<sqrp::DescriptorSetHandle> geometryDescriptorSets_;
+	sqrp::PipelineHandle geometryPipeline_;
+	std::vector<sqrp::DescriptorSetHandle> lightingDescriptorSets_;
+	sqrp::PipelineHandle lightingPipeline_;
 
 
 public:
