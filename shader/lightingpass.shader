@@ -1,9 +1,33 @@
 #version 450
 
+layout(std140, set = 0, binding = 0) uniform Camera
+{
+	mat4 view;
+	mat4 proj;
+} camera;
+
+layout(std140, set = 0, binding = 1) uniform Object
+{
+	// add model uniforms here
+	mat4 model;
+	mat4 ITModel;
+} object;
+
+layout(std140, set = 0, binding = 2) uniform Light
+{
+	vec4 lightPos;
+	vec4 lightColor;
+} light;
+
+layout(std140, set = 0, binding = 3) uniform Color
+{
+	vec4 baseColor;
+} color;
+
 // G-Buffer ƒTƒ“ƒvƒ‰[
-layout(set = 0, binding = 0) uniform sampler2D gBaseColorMetallness;
-layout(set = 0, binding = 1) uniform sampler2D gNormalRoughness;
-layout(set = 0, binding = 2) uniform sampler2D gEmissiveAO;
+layout(set = 0, binding = 4) uniform sampler2D gBaseColorMetallness;
+layout(set = 0, binding = 5) uniform sampler2D gNormalRoughness;
+layout(set = 0, binding = 6) uniform sampler2D gEmissiveAO;
 
 #ifdef GL_VERTEX_SHADER
 layout(location = 0) in vec4 vPosition;
@@ -37,7 +61,7 @@ layout(location = 0) out vec4 outColor;
 void main()
 {
     vec3 baseColor  = texture(gBaseColorMetallness, fragUV).rgb;
-    vec3 normal  = texture(gNormalRoughness, fragUV).rgb;
+    vec3 normal  = texture(gNormalRoughness, fragUV).rgb * 2.0f - 1.0f;
     float mr      = texture(gBaseColorMetallness, fragUV).a;
     float roughness = texture(gNormalRoughness, fragUV).a;
     float ao     = texture(gEmissiveAO, fragUV).a;
@@ -50,13 +74,13 @@ void main()
 
     // vec3 ambient  = 0.1 * albedo * ao;
 
-    // outColor = vec4(diffuse + ambient, 1.0);
-    // if (baseColor.r >= 1.0f) {
-    //     outColor = vec4(0.0f, 1.0f, 0.0f, 1.0);
-    // } else {
-    //     outColor = vec4(baseColor, 1.0);
-    // }
-    outColor = vec4(baseColor, 1.0);
+    vec3 N = normalize(normal.xyz);
+	vec3 L = normalize(light.lightPos.xyz);
+
+	float diff = max(dot(N, L), 0.0);
+
+	vec3 outputColor = baseColor.rgb * light.lightColor.rgb * diff;
+    outColor = vec4(outputColor, 1.0);
     // outColor = vec4(normal, 1.0);
     // outColor = vec4(vec3(1.0f, 0.0f, 0.0f), 1.0);
 }

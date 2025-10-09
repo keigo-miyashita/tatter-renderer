@@ -67,9 +67,8 @@ void main()
 
 	vec3 outputColor = color.baseColor.rgb * light.lightColor.rgb * diff;
 
-    outBaseColorMetallness = vec4(outputColor, 1.0f);
-    // outBaseColorMetallness = vec4(1.0f, 0.0f, 0.0f, 1.0f);
-    // outBaseColorMetallness = vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    // outBaseColorMetallness = vec4(outputColor, 1.0f);
+    outBaseColorMetallness = vec4(color.baseColor.rgb, 1.0f);
 
     // –@ü‚ğ[0,1]‚É•ÏŠ·‚µ‚ÄŠi”[
     outNormalRoughness = vec4(normalize(fNormal.rgb) * 0.5 + 0.5, 1.0);
