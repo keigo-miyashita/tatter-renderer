@@ -55,5 +55,6 @@ public:
 
 	virtual void OnStart() override;
 	virtual void OnUpdate() override;
+	virtual void OnResize(unsigned int width, unsigned int height) override;
 	virtual void OnTerminate() override;
 };

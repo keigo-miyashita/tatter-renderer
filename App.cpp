@@ -153,7 +153,6 @@ void App::OnStart()
 	lightVertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "lightingpass.shader", sqrp::ShaderType::Vertex);
 	lightPixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "lightingpass.shader", sqrp::ShaderType::Pixel);
 
-	//pipeline_ = device_.CreatePipeline(renderPass_, swapchain_, vertShader_, pixelShader_, descriptorSet_);
 	pipeline_ = device_.CreatePipeline(renderPass_, swapchain_, vertShader_, pixelShader_, descriptorSet_);
 	
 	geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
@@ -181,7 +180,7 @@ void App::OnStart()
 
 void App::OnUpdate()
 {
-	camera_.Update();
+	camera_.Update(windowWidth_, windowHeight_);
 	cameraBuffer_->Write(CameraMatrix{ camera_.GetView(), camera_.GetProj() });
 
 	swapchain_->WaitFrame();
@@ -192,32 +191,6 @@ void App::OnUpdate()
 	auto& commandBuffer = swapchain_->GetCurrentCommandBuffer();
 
 	commandBuffer->Begin();
-
-	/*commandBuffer->BeginRenderPass(renderPass_, frameBuffer_);
-
-	commandBuffer->SetViewport(swapchain_->GetWidth(), swapchain_->GetHeight());
-	commandBuffer->SetScissor(swapchain_->GetWidth(), swapchain_->GetHeight());
-	commandBuffer->BindPipeline(pipeline_, vk::PipelineBindPoint::eGraphics);
-	commandBuffer->BindDescriptorSet(pipeline_, descriptorSet_, vk::PipelineBindPoint::eGraphics);
-	commandBuffer->BindMeshBuffer(mesh_);
-	commandBuffer->DrawMesh(mesh_);
-
-	commandBuffer->EndRenderPass();*/
-
-	/*commandBuffer->BeginRenderPass(renderPass_, frameBuffer_, swapchain_);
-
-	commandBuffer->SetViewport(swapchain_->GetWidth(), swapchain_->GetHeight());
-	commandBuffer->SetScissor(swapchain_->GetWidth(), swapchain_->GetHeight());
-	commandBuffer->BindPipeline(pipeline_, vk::PipelineBindPoint::eGraphics);
-	commandBuffer->BindDescriptorSet(pipeline_, descriptorSet_, vk::PipelineBindPoint::eGraphics);
-	commandBuffer->BindMeshBuffer(mesh_);
-	commandBuffer->DrawMesh(mesh_);
-
-	commandBuffer->EndRenderPass();*/
-
-	/*commandBuffer->TransitionLayout(geometryFrameBuffer_->GetAttachmentImage(0, infligtIndex), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal);
-	commandBuffer->TransitionLayout(geometryFrameBuffer_->GetAttachmentImage(1, infligtIndex), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal);
-	commandBuffer->TransitionLayout(geometryFrameBuffer_->GetAttachmentImage(2, infligtIndex), vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal);*/
 
 	commandBuffer->BeginRenderPass(geometryRenderPass_, geometryFrameBuffer_, swapchain_);
 
@@ -230,9 +203,33 @@ void App::OnUpdate()
 
 	commandBuffer->EndRenderPass();
 
-	/*commandBuffer->TransitionLayout(geometryFrameBuffer_->GetAttachmentImage(0, infligtIndex), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
-	commandBuffer->TransitionLayout(geometryFrameBuffer_->GetAttachmentImage(1, infligtIndex), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
-	commandBuffer->TransitionLayout(geometryFrameBuffer_->GetAttachmentImage(2, infligtIndex), vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);*/
+	commandBuffer->ImageBarrier(
+		geometryFrameBuffer_->GetAttachmentImage(0, infligtIndex),
+		vk::ImageLayout::eShaderReadOnlyOptimal,
+		vk::ImageLayout::eShaderReadOnlyOptimal,
+		vk::PipelineStageFlagBits::eColorAttachmentOutput,
+		vk::PipelineStageFlagBits::eFragmentShader,
+		vk::AccessFlagBits::eColorAttachmentWrite,
+		vk::AccessFlagBits::eShaderRead
+	);
+	commandBuffer->ImageBarrier(
+		geometryFrameBuffer_->GetAttachmentImage(1, infligtIndex),
+		vk::ImageLayout::eShaderReadOnlyOptimal,
+		vk::ImageLayout::eShaderReadOnlyOptimal,
+		vk::PipelineStageFlagBits::eColorAttachmentOutput,
+		vk::PipelineStageFlagBits::eFragmentShader,
+		vk::AccessFlagBits::eColorAttachmentWrite,
+		vk::AccessFlagBits::eShaderRead
+	);
+	commandBuffer->ImageBarrier(
+		geometryFrameBuffer_->GetAttachmentImage(2, infligtIndex),
+		vk::ImageLayout::eShaderReadOnlyOptimal,
+		vk::ImageLayout::eShaderReadOnlyOptimal,
+		vk::PipelineStageFlagBits::eColorAttachmentOutput,
+		vk::PipelineStageFlagBits::eFragmentShader,
+		vk::AccessFlagBits::eColorAttachmentWrite,
+		vk::AccessFlagBits::eShaderRead
+	);
 
 	commandBuffer->BeginRenderPass(lightingRenderPass_, lightingFrameBuffer_, swapchain_);
 
@@ -240,8 +237,6 @@ void App::OnUpdate()
 	commandBuffer->SetScissor(swapchain_->GetWidth(), swapchain_->GetHeight());
 	commandBuffer->BindPipeline(lightingPipeline_, vk::PipelineBindPoint::eGraphics);
 	commandBuffer->BindDescriptorSet(lightingPipeline_, lightingDescriptorSets_[infligtIndex], vk::PipelineBindPoint::eGraphics);
-	//commandBuffer->BindMeshBuffer(mesh_);
-	//commandBuffer->DrawMesh(mesh_);
 	commandBuffer->Draw(3, 1); // Fullscreen Triangle
 
 	commandBuffer->EndRenderPass();
@@ -254,6 +249,42 @@ void App::OnUpdate()
 	);
 
 	swapchain_->Present();
+}
+
+void App::OnResize(unsigned int width, unsigned int height)
+{
+	if (width == 0 || height == 0) return;
+	device_.WaitIdle(QueueContextType::General);
+	swapchain_->Recreate(width, height);
+	geometryFrameBuffer_->Recreate(width, height);
+	lightingFrameBuffer_->Recreate(width, height/*, swapchain_*/);
+
+	geometryDescriptorSets_.clear();
+	lightingDescriptorSets_.clear();
+	geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
+	lightingDescriptorSets_.resize(swapchain_->GetInflightCount());
+	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
+		geometryDescriptorSets_[i] = device_.CreateDescriptorSet({
+			{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			{ colorBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }
+			}
+		);
+
+		lightingDescriptorSets_[i] = device_.CreateDescriptorSet({
+			{ geometryFrameBuffer_->GetAttachmentImage(0, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			{ geometryFrameBuffer_->GetAttachmentImage(1, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			{ geometryFrameBuffer_->GetAttachmentImage(2, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			}
+		);
+	}
+
+	geometryPipeline_.reset();
+	lightingPipeline_.reset();
+
+	geometryPipeline_ = device_.CreatePipeline(geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_, geometryDescriptorSets_[0]);
+	lightingPipeline_ = device_.CreatePipeline(lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_, lightingDescriptorSets_[0]);
 }
 
 void App::OnTerminate()

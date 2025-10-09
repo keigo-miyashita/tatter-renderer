@@ -1,19 +1,19 @@
 #version 450
 
-layout(std140, set = 0, binding = 0) uniform Camera /*type name*/
+layout(std140, set = 0, binding = 0) uniform Camera
 {
 	mat4 view;
 	mat4 proj;
 } camera;
 
-layout(std140, set = 0, binding = 1) uniform Object /*type name*/
+layout(std140, set = 0, binding = 1) uniform Object
 {
 	// add model uniforms here
 	mat4 model;
 	mat4 ITModel;
 } object;
 
-layout(std140, set = 0, binding = 2) uniform Light /*type name*/
+layout(std140, set = 0, binding = 2) uniform Light
 {
 	vec4 lightPos;
 	vec4 lightColor;
@@ -65,9 +65,9 @@ void main()
 
 	float diff = max(dot(N, L), 0.0);
 
-	vec3 color = color.baseColor.rgb * light.lightColor.rgb * diff;
+	vec3 outputColor = color.baseColor.rgb * light.lightColor.rgb * diff;
 
-    outBaseColorMetallness = vec4(color, 1.0f);
+    outBaseColorMetallness = vec4(outputColor, 1.0f);
     // outBaseColorMetallness = vec4(1.0f, 0.0f, 0.0f, 1.0f);
     // outBaseColorMetallness = vec4(1.0f, 0.0f, 0.0f, 1.0f);
 

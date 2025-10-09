@@ -51,7 +51,13 @@ void main()
     // vec3 ambient  = 0.1 * albedo * ao;
 
     // outColor = vec4(diffuse + ambient, 1.0);
+    // if (baseColor.r >= 1.0f) {
+    //     outColor = vec4(0.0f, 1.0f, 0.0f, 1.0);
+    // } else {
+    //     outColor = vec4(baseColor, 1.0);
+    // }
     outColor = vec4(baseColor, 1.0);
+    // outColor = vec4(normal, 1.0);
     // outColor = vec4(vec3(1.0f, 0.0f, 0.0f), 1.0);
 }
 #endif
