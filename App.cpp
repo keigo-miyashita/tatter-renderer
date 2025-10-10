@@ -16,15 +16,17 @@ void App::OnStart()
 	swapchain_ = device_.CreateSwapchain(windowWidth_, windowHeight_);
 
 	renderPass_ = device_.CreateRenderPass(swapchain_);
+
 	std::array<vk::Format, 3> gbufferFormats = {
 		vk::Format::eR8G8B8A8Unorm,     // BaseColor + Metalness
 		vk::Format::eR16G16B16A16Sfloat, // Normal + Roughness
 		vk::Format::eR8G8B8A8Unorm      // Emissive + AO
 	};
+
 	std::map<string, AttachmentInfo> geometryAttachmentNameToInfo;
 	AttachmentInfo gbuffer0; // BaseColor + Metalness
 	gbuffer0.attachmentDesc
-		.setFormat(vk::Format::eR8G8B8A8Unorm)
+		.setFormat(gbufferFormats[0])
 		.setSamples(vk::SampleCountFlagBits::e1)
 		.setLoadOp(vk::AttachmentLoadOp::eClear)
 		.setStoreOp(vk::AttachmentStoreOp::eStore)
@@ -37,14 +39,12 @@ void App::OnStart()
 
 	AttachmentInfo gbuffer1; // Normal + Roughness
 	gbuffer1 = gbuffer0;
-	gbuffer1.attachmentDesc.format = vk::Format::eR16G16B16A16Sfloat;
-	gbuffer1.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	gbuffer1.attachmentDesc.format = gbufferFormats[1];
 	geometryAttachmentNameToInfo["NormalRoughness"] = gbuffer1;
 
 	AttachmentInfo gbuffer2; // Emissive + AO
 	gbuffer2 = gbuffer0;
-	gbuffer2.attachmentDesc.format = vk::Format::eR8G8B8A8Unorm;
-	gbuffer2.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	gbuffer2.attachmentDesc.format = gbufferFormats[2];
 	geometryAttachmentNameToInfo["EmissiveAO"] = gbuffer2;
 
 	AttachmentInfo depthAttachment;
@@ -62,13 +62,33 @@ void App::OnStart()
 
 	SubPassInfo geometrySubpass;
 	geometrySubpass.attachmentInfos = {"BaseColorMetallness", "NormalRoughness", "EmissiveAO",  "Depth"};
-	//geometrySubpass.attachmentInfos = { gbuffer0, /*&gbuffer1, &gbuffer2,*/ depthAttachment };
 
 	geometryRenderPass_ = device_.CreateRenderPass(
 		{ geometrySubpass }, geometryAttachmentNameToInfo
 	);
 
 	std::map<string, AttachmentInfo> lightingAttachmentNameToInfo;
+	AttachmentInfo renderingResultAttachment;
+	renderingResultAttachment.attachmentDesc
+		.setFormat(swapchain_->GetSurfaceFormat())
+		.setSamples(vk::SampleCountFlagBits::e1)
+		.setLoadOp(vk::AttachmentLoadOp::eClear)
+		.setStoreOp(vk::AttachmentStoreOp::eStore)
+		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+		.setInitialLayout(vk::ImageLayout::eUndefined)
+		.setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+	renderingResultAttachment.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	lightingAttachmentNameToInfo["RenderingResult"] = renderingResultAttachment;
+
+	SubPassInfo lightingSubpass;
+	lightingSubpass.attachmentInfos = { "RenderingResult"};
+
+	lightingRenderPass_ = device_.CreateRenderPass(
+		{ lightingSubpass }, lightingAttachmentNameToInfo
+	);
+
+	std::map<string, AttachmentInfo> presentAttachmentNameToInfo;
 	AttachmentInfo swapchainAttachment;
 	swapchainAttachment.attachmentDesc
 		.setFormat(swapchain_->GetSurfaceFormat())
@@ -80,13 +100,13 @@ void App::OnStart()
 		.setInitialLayout(vk::ImageLayout::eUndefined)
 		.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
 	swapchainAttachment.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-	lightingAttachmentNameToInfo["Swapchain"] = swapchainAttachment;	
+	presentAttachmentNameToInfo["Swapchain"] = swapchainAttachment;
 
-	SubPassInfo lightingSubpass;
-	lightingSubpass.attachmentInfos = { "Swapchain"};
+	SubPassInfo presentSubpass;
+	presentSubpass.attachmentInfos = { "Swapchain" };
 
-	lightingRenderPass_ = device_.CreateRenderPass(
-		{ lightingSubpass }, lightingAttachmentNameToInfo
+	presentRenderPass_ = device_.CreateRenderPass(
+		{ presentSubpass }, presentAttachmentNameToInfo
 	);
 
 	frameBuffer_ = device_.CreateFrameBuffer(renderPass_, swapchain_);
@@ -99,13 +119,23 @@ void App::OnStart()
 			{ gbufferFormats[2], vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, "EmissiveAO"},
 			{ vk::Format::eD32Sfloat, vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled, "Depth"}
 		},
-		swapchain_->GetWidth(),
-		swapchain_->GetHeight(),
+		sceneWidth_,
+		sceneHeight_,
 		swapchain_->GetInflightCount()
 	);
 
 	lightingFrameBuffer_ = device_.CreateFrameBuffer(
 		lightingRenderPass_,
+		{
+			{ swapchain_->GetSurfaceFormat(), vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled, "RenderingResult"},
+		},
+		sceneWidth_,
+		sceneHeight_,
+		swapchain_->GetInflightCount()
+	);
+
+	presentFrameBuffer_ = device_.CreateFrameBuffer(
+		presentRenderPass_,
 		swapchain_,
 		false
 	);
@@ -113,7 +143,7 @@ void App::OnStart()
 	mesh_ = device_.CreateMesh(string(MODEL_DIR) + "Suzanne.gltf");
 
 	// Camera
-	camera_.Init((float)GetWindowWidth() / (float)GetWindowHeight(), glm::vec3(0.0f, 0.0f, 5.0f)); // Note sign
+	camera_.Init((float)sceneWidth_ / (float)sceneHeight_, glm::vec3(0.0f, 0.0f, 5.0f)); // Note sign
 
 	// Light
 	light0_.pos = glm::vec4(10.0f, 10.0f, -5.0f, 1.0f);
@@ -121,9 +151,6 @@ void App::OnStart()
 
 	// Sphere0
 	object_ = {};
-	/*XMMATRIX modelMat = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(180)), XMMatrixIdentity());
-	sphere0_.model = modelMat;
-	sphere0_.invTransModel = XMMatrixTranspose(XMMatrixInverse(nullptr, sphere0_.model));*/
 
 	cameraBuffer_ = device_.CreateBuffer(sizeof(CameraMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	cameraBuffer_->Write(CameraMatrix{ camera_.GetView(), camera_.GetProj() });
@@ -157,6 +184,7 @@ void App::OnStart()
 	
 	geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
 	lightingDescriptorSets_.resize(swapchain_->GetInflightCount());
+	guiDescriptorSets_.resize(swapchain_->GetInflightCount());
 	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
 		geometryDescriptorSets_[i] = device_.CreateDescriptorSet({
 			{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
@@ -176,35 +204,137 @@ void App::OnStart()
 			{ geometryFrameBuffer_->GetAttachmentImage(2, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 			}
 		);
+
+		guiDescriptorSets_[i] = device_.CreateDescriptorSet({
+			{ lightingFrameBuffer_->GetAttachmentImage(0, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment },
+			}
+		);
 	}
 
 	geometryPipeline_ = device_.CreatePipeline(geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_, geometryDescriptorSets_[0]);
 	lightingPipeline_ = device_.CreatePipeline(lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_, lightingDescriptorSets_[0]);
+
+	gui_ = device_.CreateGUI(pWindow_, swapchain_, presentRenderPass_);
+
+	panelWidth_ = windowWidth_ - sceneWidth_;
+	panelHeight_ = windowHeight_;
+	filePanelWidth_ = sceneWidth_;
+	filePanelHeight_ = windowHeight_ - sceneHeight_;
+	changedSceneWidth_ = sceneWidth_;
+	changedSceneHeight_ = sceneHeight_;
+	changedPanelWidth_ = panelWidth_;
+	changedPanelHeight_ = panelHeight_;
+	changedFilePanelWidth_ = filePanelWidth_;
+	changedFilePanelHeight_ = filePanelHeight_;
 }
 
 void App::OnUpdate()
 {
-	camera_.Update(windowWidth_, windowHeight_);
+	bool isChangedSceneSize = false;
+	if (changedSceneWidth_ != sceneWidth_ && !isChangedSceneSize) {
+		sceneWidth_ = changedSceneWidth_;
+		panelWidth_ = windowWidth_ - sceneWidth_;
+		filePanelWidth_ = sceneWidth_;
+		cout << "Change scene width" << endl;
+		isChangedSceneSize = true;
+	}
+	if (changedSceneHeight_ != sceneHeight_ && !isChangedSceneSize) {
+		cout << "Scene height = " << sceneHeight_ << endl;
+		cout << "changedSceneHeight_ = " << changedSceneHeight_ << endl;
+		sceneHeight_ = changedSceneHeight_;
+		filePanelHeight_ = windowHeight_ - sceneHeight_;
+		cout << "Scene height = " << sceneHeight_ << endl;
+		isChangedSceneSize = true;
+	}
+	if (changedPanelWidth_ != panelWidth_ && !isChangedSceneSize) {
+		panelWidth_ = changedPanelWidth_;
+		sceneWidth_ = windowWidth_ - panelWidth_;
+		filePanelWidth_ = sceneWidth_;
+		filePanelHeight_ = windowHeight_ - sceneHeight_;
+		cout << "change panel" << endl;
+		isChangedSceneSize = true;
+	}
+	if (changedFilePanelHeight_ != filePanelHeight_ && !isChangedSceneSize) {
+		cout << "change file panel" << endl;
+		filePanelHeight_ = changedFilePanelHeight_;
+		sceneHeight_ = windowHeight_ - filePanelHeight_;
+		sceneWidth_ = filePanelWidth_;
+		panelWidth_ = windowWidth_ - sceneWidth_;
+		isChangedSceneSize = true;
+	}
+	if (changedFilePanelWidth_ != filePanelWidth_ && !isChangedSceneSize) {
+		cout << "change file panel" << endl;
+		filePanelWidth_ = changedFilePanelWidth_;
+		sceneWidth_ = filePanelWidth_;
+		panelWidth_ = windowWidth_ - sceneWidth_;
+		isChangedSceneSize = true;
+	}
+
+	if (isChangedSceneSize) {
+
+		device_.WaitIdle(QueueContextType::General);
+		swapchain_->Recreate(windowWidth_, windowHeight_);
+		geometryFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+		lightingFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+		presentFrameBuffer_->Recreate(windowWidth_, windowHeight_);
+
+		geometryDescriptorSets_.clear();
+		lightingDescriptorSets_.clear();
+		guiDescriptorSets_.clear();
+		geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
+		lightingDescriptorSets_.resize(swapchain_->GetInflightCount());
+		guiDescriptorSets_.resize(swapchain_->GetInflightCount());
+		for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
+			geometryDescriptorSets_[i] = device_.CreateDescriptorSet({
+				{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ colorBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }
+				}
+			);
+
+			lightingDescriptorSets_[i] = device_.CreateDescriptorSet({
+				{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ colorBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ geometryFrameBuffer_->GetAttachmentImage(0, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ geometryFrameBuffer_->GetAttachmentImage(1, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ geometryFrameBuffer_->GetAttachmentImage(2, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				}
+				);
+
+			guiDescriptorSets_[i] = device_.CreateDescriptorSet({
+				{ lightingFrameBuffer_->GetAttachmentImage(0, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment },
+				}
+				);
+		}
+
+		geometryPipeline_.reset();
+		lightingPipeline_.reset();
+
+		geometryPipeline_ = device_.CreatePipeline(geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_, geometryDescriptorSets_[0]);
+		lightingPipeline_ = device_.CreatePipeline(lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_, lightingDescriptorSets_[0]);
+	}
+
+	camera_.Update(sceneWidth_, sceneHeight_);
 	cameraBuffer_->Write(CameraMatrix{ camera_.GetView(), camera_.GetProj() });
 
 	swapchain_->WaitFrame();
 
-	//cout << "test" << endl;
 	uint32_t infligtIndex = swapchain_->GetCurrentInflightIndex();
 
 	auto& commandBuffer = swapchain_->GetCurrentCommandBuffer();
 
 	commandBuffer->Begin();
 
-	commandBuffer->BeginRenderPass(geometryRenderPass_, geometryFrameBuffer_, swapchain_);
-
-	commandBuffer->SetViewport(swapchain_->GetWidth(), swapchain_->GetHeight());
-	commandBuffer->SetScissor(swapchain_->GetWidth(), swapchain_->GetHeight());
+	commandBuffer->BeginRenderPass(geometryRenderPass_, geometryFrameBuffer_, infligtIndex);
+	commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
+	commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
 	commandBuffer->BindPipeline(geometryPipeline_, vk::PipelineBindPoint::eGraphics);
 	commandBuffer->BindDescriptorSet(geometryPipeline_, geometryDescriptorSets_[infligtIndex], vk::PipelineBindPoint::eGraphics);
 	commandBuffer->BindMeshBuffer(mesh_);
 	commandBuffer->DrawMesh(mesh_);
-
 	commandBuffer->EndRenderPass();
 
 	commandBuffer->ImageBarrier(
@@ -235,14 +365,70 @@ void App::OnUpdate()
 		vk::AccessFlagBits::eShaderRead
 	);
 
-	commandBuffer->BeginRenderPass(lightingRenderPass_, lightingFrameBuffer_, swapchain_);
-
-	commandBuffer->SetViewport(swapchain_->GetWidth(), swapchain_->GetHeight());
-	commandBuffer->SetScissor(swapchain_->GetWidth(), swapchain_->GetHeight());
+	commandBuffer->BeginRenderPass(lightingRenderPass_, lightingFrameBuffer_, infligtIndex);
+	commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
+	commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
 	commandBuffer->BindPipeline(lightingPipeline_, vk::PipelineBindPoint::eGraphics);
 	commandBuffer->BindDescriptorSet(lightingPipeline_, lightingDescriptorSets_[infligtIndex], vk::PipelineBindPoint::eGraphics);
 	commandBuffer->Draw(3, 1); // Fullscreen Triangle
+	commandBuffer->EndRenderPass();
 
+	commandBuffer->BeginRenderPass(presentRenderPass_, presentFrameBuffer_, infligtIndex);
+	commandBuffer->SetViewport(swapchain_->GetWidth(), swapchain_->GetHeight());
+	commandBuffer->SetScissor(swapchain_->GetWidth(), swapchain_->GetHeight());
+
+	gui_->NewFrame();
+
+	ImGuiIO& io = ImGui::GetIO();
+
+	ImGui::SetNextWindowPos(ImVec2(0, 0));
+	ImGui::SetNextWindowSize(ImVec2(sceneWidth_, sceneHeight_));
+	ImGui::Begin("Scene View", nullptr);
+	ImVec2 size = ImGui::GetWindowSize();
+	if (ImGui::IsWindowHovered()) {
+		Input::SetCatchInput(true);
+	}
+	changedSceneWidth_ = size.x;
+	changedSceneHeight_ = size.y;
+	ImTextureID texId = (ImTextureID)((VkDescriptorSet)guiDescriptorSets_[infligtIndex]->GetDescriptorSet());
+	ImGui::Image(texId, ImVec2(sceneWidth_, sceneHeight_)); // シーンテクスチャ表示
+	ImGui::End();
+
+	// 2. ツールパネル描画（横に並べる）
+	float position[] = {0.2f, 0.2f, 0.2f};
+	float rotation[] = {0.2f, 0.2f, 0.2f};
+	ImGui::SetNextWindowPos(ImVec2(sceneWidth_, 0));
+	ImGui::SetNextWindowSize(ImVec2(panelWidth_, windowHeight_));
+	ImGui::Begin("Inspector", nullptr);
+	size = ImGui::GetWindowSize();
+	if (ImGui::IsWindowHovered()) {
+		cout << "hovered panel" << endl;
+		Input::SetCatchInput(false);
+	}
+	changedPanelWidth_ = size.x;
+	changedPanelHeight_ = size.y;
+	ImGui::Text("Transform");
+	ImGui::SliderFloat3("Position", position, -10.0f, 10.0f);
+	ImGui::SliderFloat3("Rotation", rotation, -180.0f, 180.0f);
+	ImGui::End();
+
+	// 3. ファイルツールパネル描画（縦に並べる）
+	ImGui::SetNextWindowPos(ImVec2(0, sceneHeight_));
+	ImGui::SetNextWindowSize(ImVec2(filePanelWidth_, filePanelHeight_));
+	ImGui::Begin("Test", nullptr);
+	size = ImGui::GetWindowSize();
+	if (ImGui::IsWindowHovered()) {
+		cout << "hovered file panel" << endl;
+		Input::SetCatchInput(false);
+	}
+	changedFilePanelWidth_ = size.x;
+	changedFilePanelHeight_ = size.y;
+	ImGui::Text("Test Transform");
+	ImGui::SliderFloat3("Position", position, -10.0f, 10.0f);
+	ImGui::SliderFloat3("Rotation", rotation, -180.0f, 180.0f);
+	ImGui::End();
+
+	commandBuffer->DrawGui(*gui_);
 	commandBuffer->EndRenderPass();
 
 	commandBuffer->End();
@@ -258,15 +444,34 @@ void App::OnUpdate()
 void App::OnResize(unsigned int width, unsigned int height)
 {
 	if (width == 0 || height == 0) return;
+	windowWidth_ = width;
+	windowHeight_ = height;
+
+	sceneWidth_ = windowWidth_ * sceneViewScaleX_;
+	sceneHeight_ = windowHeight_ * sceneViewScaleY_;
+	changedSceneWidth_ = sceneWidth_;
+	changedSceneHeight_ = sceneHeight_;
+	panelWidth_ = windowWidth_ * (1.0f - sceneViewScaleX_);
+	panelHeight_ = windowHeight_;
+	changedPanelWidth_ = panelWidth_;
+	changedPanelHeight_ = panelHeight_;
+	filePanelWidth_ = windowWidth_ * sceneViewScaleX_;
+	filePanelHeight_ = windowHeight_ * (1.0f - sceneViewScaleY_);
+	changedFilePanelWidth_ = filePanelWidth_;
+	changedFilePanelHeight_ = filePanelHeight_;
+
 	device_.WaitIdle(QueueContextType::General);
 	swapchain_->Recreate(width, height);
-	geometryFrameBuffer_->Recreate(width, height);
-	lightingFrameBuffer_->Recreate(width, height/*, swapchain_*/);
+	geometryFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+	lightingFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+	presentFrameBuffer_->Recreate(width, height);
 
 	geometryDescriptorSets_.clear();
 	lightingDescriptorSets_.clear();
+	guiDescriptorSets_.clear();
 	geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
 	lightingDescriptorSets_.resize(swapchain_->GetInflightCount());
+	guiDescriptorSets_.resize(swapchain_->GetInflightCount());
 	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
 		geometryDescriptorSets_[i] = device_.CreateDescriptorSet({
 			{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
@@ -284,6 +489,11 @@ void App::OnResize(unsigned int width, unsigned int height)
 			{ geometryFrameBuffer_->GetAttachmentImage(0, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 			{ geometryFrameBuffer_->GetAttachmentImage(1, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 			{ geometryFrameBuffer_->GetAttachmentImage(2, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			}
+		);
+
+		guiDescriptorSets_[i] = device_.CreateDescriptorSet({
+			{ lightingFrameBuffer_->GetAttachmentImage(0, i), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment },
 			}
 		);
 	}
