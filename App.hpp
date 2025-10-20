@@ -3,6 +3,20 @@
 #include <pch.hpp>
 #include <sqrap.hpp>
 
+#include "Material.hpp"
+#include "EnvironmentMap.hpp"
+
+struct DetailCamera
+{
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::mat4 invView;
+	glm::mat4 invProj;
+	glm::vec4 pos;
+	float nearZ;
+	float farZ;
+};
+
 struct Light
 {
 	glm::vec4 pos;
@@ -18,15 +32,29 @@ private:
 	sqrp::GUIHandle gui_;
 
 	sqrp::SwapchainHandle swapchain_;
+
+	std::vector<sqrp::ImageHandle> baseColorMetallnessImages_;
+	std::vector<sqrp::ImageHandle> normalRoughnessImages_;
+	std::vector<sqrp::ImageHandle> emissiveAOImages_;
+	std::vector<sqrp::ImageHandle> depthImages_;
+	std::vector<sqrp::ImageHandle> renderImages_;
+	std::vector<sqrp::ImageHandle> toneMappedImages_;
+
 	sqrp::RenderPassHandle renderPass_;
 	sqrp::RenderPassHandle geometryRenderPass_;
 	sqrp::RenderPassHandle lightingRenderPass_;
+	sqrp::RenderPassHandle skyboxRenderPass_;
+	sqrp::RenderPassHandle toneMapRenderPass_;
 	sqrp::RenderPassHandle presentRenderPass_;
 	sqrp::FrameBufferHandle	frameBuffer_;
 	sqrp::FrameBufferHandle	geometryFrameBuffer_;
 	sqrp::FrameBufferHandle	lightingFrameBuffer_;
+	sqrp::FrameBufferHandle skyboxFrameBuffer_;
+	sqrp::FrameBufferHandle toneMapFrameBuffer_;
 	sqrp::FrameBufferHandle presentFrameBuffer_;
 	sqrp::MeshHandle mesh_;
+	MaterialHandle material_;
+	EnvMapHandle envMap_;
 
 	sqrp::Camera camera_;
 	Light light0_;
@@ -36,6 +64,7 @@ private:
 	sqrp::BufferHandle objectBuffer_;
 	sqrp::BufferHandle lightBuffer_;
 	sqrp::BufferHandle colorBuffer_;
+	sqrp::BufferHandle detailCameraBuffer_;
 
 	sqrp::ShaderHandle vertShader_;
 	sqrp::ShaderHandle pixelShader_;
@@ -43,16 +72,40 @@ private:
 	sqrp::ShaderHandle geomPixelShader_;
 	sqrp::ShaderHandle lightVertShader_;
 	sqrp::ShaderHandle lightPixelShader_;
+	sqrp::ShaderHandle gltfGeomVertShader_;
+	sqrp::ShaderHandle gltfGeomPixelShader_;
+	sqrp::ShaderHandle gltfLightVertShader_;
+	sqrp::ShaderHandle gltfLightPixelShader_;
+	sqrp::ShaderHandle decodeHDRCompShader_;
+	sqrp::ShaderHandle envMapCompShader_;
+	sqrp::ShaderHandle skyboxVertShader_;
+	sqrp::ShaderHandle skyboxPixelShader_;
+	sqrp::ShaderHandle toneMapVertShader_;
+	sqrp::ShaderHandle toneMapPixelShader_;
+	sqrp::ShaderHandle irradianceCompShader_;
+	sqrp::ShaderHandle prefilterCompShader_;
+	sqrp::ShaderHandle brdfLUTCompShader_;
 
 	sqrp::DescriptorSetHandle descriptorSet_;
-	sqrp::PipelineHandle pipeline_;
+	sqrp::GraphicsPipelineHandle pipeline_;
 
 	std::vector<sqrp::DescriptorSetHandle> guiDescriptorSets_;
 
 	std::vector<sqrp::DescriptorSetHandle> geometryDescriptorSets_;
-	sqrp::PipelineHandle geometryPipeline_;
+	sqrp::GraphicsPipelineHandle geometryPipeline_;
 	std::vector<sqrp::DescriptorSetHandle> lightingDescriptorSets_;
-	sqrp::PipelineHandle lightingPipeline_;
+	sqrp::GraphicsPipelineHandle lightingPipeline_;
+
+	std::vector<sqrp::DescriptorSetHandle> gltfGeomDescriptorSets_;
+	sqrp::GraphicsPipelineHandle gltfGeomPipeline_;
+	std::vector<sqrp::DescriptorSetHandle> gltfLightDescriptorSets_;
+	sqrp::GraphicsPipelineHandle gltfLightPipeline_;
+
+	std::vector<sqrp::DescriptorSetHandle> skyboxDescriptorSets_;
+	sqrp::GraphicsPipelineHandle skyboxPipeline_;
+
+	std::vector<sqrp::DescriptorSetHandle> toneMapDescriptorSets_;
+	sqrp::GraphicsPipelineHandle toneMapPipeline_;
 
 	float sceneViewScaleX_ = 0.8f;
 	float sceneViewScaleY_ = 0.7f;

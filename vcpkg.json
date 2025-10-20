@@ -13,7 +13,8 @@
     },
     "vulkan-memory-allocator",
     "glslang",
-    "imguizmo"
+    "imguizmo",
+    "stb"
   ],
   "builtin-baseline": "0d9d4684352ba8de70bdf251c6fc9a3c464fa12b"
 }
