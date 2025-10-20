@@ -558,12 +558,8 @@ void App::OnUpdate()
 	if (isChangedSceneSize) {
 
 		device_.WaitIdle(QueueContextType::General);
-		swapchain_->Recreate(windowWidth_, windowHeight_);
-		geometryFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
-		lightingFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
-		presentFrameBuffer_->Recreate(windowWidth_, windowHeight_);
 
-		baseColorMetallnessImages_.clear();
+		/*baseColorMetallnessImages_.clear();
 		normalRoughnessImages_.clear();
 		emissiveAOImages_.clear();
 		depthImages_.clear();
@@ -575,7 +571,7 @@ void App::OnUpdate()
 		emissiveAOImages_.resize(swapchain_->GetInflightCount());
 		depthImages_.resize(swapchain_->GetInflightCount());
 		renderImages_.resize(swapchain_->GetInflightCount());
-		toneMappedImages_.resize(swapchain_->GetInflightCount());
+		toneMappedImages_.resize(swapchain_->GetInflightCount());*/
 		vk::SamplerCreateInfo colorSamplerInfo;
 		colorSamplerInfo
 			.setMagFilter(vk::Filter::eLinear)
@@ -612,7 +608,13 @@ void App::OnUpdate()
 			.setUnnormalizedCoordinates(VK_FALSE);
 
 		for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
-			baseColorMetallnessImages_[i] = device_.CreateImage(
+			baseColorMetallnessImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+			normalRoughnessImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+			emissiveAOImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+			depthImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+			renderImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+			toneMappedImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+			/*baseColorMetallnessImages_[i] = device_.CreateImage(
 				"BaseColorMetallness" + to_string(i),
 				vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
 				vk::ImageType::e2D,
@@ -694,18 +696,29 @@ void App::OnUpdate()
 				1,
 				vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
 				colorSamplerInfo
-			);
+			);*/
 		}
+
+		swapchain_->Recreate(windowWidth_, windowHeight_);
+		geometryFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+		lightingFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+		skyboxFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+		toneMapFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+		presentFrameBuffer_->Recreate(windowWidth_, windowHeight_);
 
 		geometryDescriptorSets_.clear();
 		lightingDescriptorSets_.clear();
 		gltfGeomDescriptorSets_.clear();
 		gltfLightDescriptorSets_.clear();
+		skyboxDescriptorSets_.clear();
+		toneMapDescriptorSets_.clear();
 		guiDescriptorSets_.clear();
 		geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
 		lightingDescriptorSets_.resize(swapchain_->GetInflightCount());
 		gltfGeomDescriptorSets_.resize(swapchain_->GetInflightCount());
 		gltfLightDescriptorSets_.resize(swapchain_->GetInflightCount());
+		skyboxDescriptorSets_.resize(swapchain_->GetInflightCount());
+		toneMapDescriptorSets_.resize(swapchain_->GetInflightCount());
 		guiDescriptorSets_.resize(swapchain_->GetInflightCount());
 		for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
 			geometryDescriptorSets_[i] = device_.CreateDescriptorSet({
@@ -757,8 +770,14 @@ void App::OnUpdate()
 				}
 				);
 
+			skyboxDescriptorSets_[i] = device_.CreateDescriptorSet({
+			{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			{ envMap_->GetEnvMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				}
+				);
+
 			toneMapDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ renderImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ renderImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
 				}
 				);
 		}
@@ -781,6 +800,16 @@ void App::OnUpdate()
 		gltfLightPipeline_ = device_.CreateGraphicsPipeline(
 			lightingRenderPass_, swapchain_, gltfLightVertShader_, gltfLightPixelShader_,
 			gltfLightDescriptorSets_[0]
+		);
+
+		skyboxPipeline_ = device_.CreateGraphicsPipeline(
+			skyboxRenderPass_, swapchain_, skyboxVertShader_, skyboxPixelShader_,
+			skyboxDescriptorSets_[0], {}, false
+		);
+
+		toneMapPipeline_ = device_.CreateGraphicsPipeline(
+			toneMapRenderPass_, swapchain_, toneMapVertShader_, toneMapPixelShader_,
+			toneMapDescriptorSets_[0]
 		);
 	}
 
@@ -1033,20 +1062,167 @@ void App::OnResize(unsigned int width, unsigned int height)
 	changedFilePanelHeight_ = filePanelHeight_;
 
 	device_.WaitIdle(QueueContextType::General);
+
+	/*baseColorMetallnessImages_.clear();
+	normalRoughnessImages_.clear();
+	emissiveAOImages_.clear();
+	depthImages_.clear();
+	renderImages_.clear();
+	toneMappedImages_.clear();
+
+	baseColorMetallnessImages_.resize(swapchain_->GetInflightCount());
+	normalRoughnessImages_.resize(swapchain_->GetInflightCount());
+	emissiveAOImages_.resize(swapchain_->GetInflightCount());
+	depthImages_.resize(swapchain_->GetInflightCount());
+	renderImages_.resize(swapchain_->GetInflightCount());
+	toneMappedImages_.resize(swapchain_->GetInflightCount());*/
+	vk::SamplerCreateInfo colorSamplerInfo;
+	colorSamplerInfo
+		.setMagFilter(vk::Filter::eLinear)
+		.setMinFilter(vk::Filter::eLinear)
+		.setMipmapMode(vk::SamplerMipmapMode::eNearest)
+		.setAddressModeU(vk::SamplerAddressMode::eClampToEdge)
+		.setAddressModeV(vk::SamplerAddressMode::eClampToEdge)
+		.setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
+		.setMipLodBias(0.0f)
+		.setAnisotropyEnable(VK_FALSE)
+		.setMaxAnisotropy(1.0f)
+		.setCompareEnable(VK_FALSE)
+		.setCompareOp(vk::CompareOp::eAlways)
+		.setMinLod(0.0f)
+		.setMaxLod(0.0f)
+		.setBorderColor(vk::BorderColor::eIntOpaqueWhite)
+		.setUnnormalizedCoordinates(VK_FALSE);
+	vk::SamplerCreateInfo depthSamplerInfo;
+	depthSamplerInfo
+		.setMagFilter(vk::Filter::eNearest)
+		.setMinFilter(vk::Filter::eNearest)
+		.setMipmapMode(vk::SamplerMipmapMode::eNearest)
+		.setAddressModeU(vk::SamplerAddressMode::eClampToEdge)
+		.setAddressModeV(vk::SamplerAddressMode::eClampToEdge)
+		.setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
+		.setMipLodBias(0.0f)
+		.setAnisotropyEnable(VK_FALSE)
+		.setMaxAnisotropy(1.0f)
+		.setCompareEnable(VK_FALSE)
+		.setCompareOp(vk::CompareOp::eAlways)
+		.setMinLod(0.0f)
+		.setMaxLod(0.0f)
+		.setBorderColor(vk::BorderColor::eIntOpaqueWhite)
+		.setUnnormalizedCoordinates(VK_FALSE);
+
+	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
+		baseColorMetallnessImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		normalRoughnessImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		emissiveAOImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		depthImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		renderImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		toneMappedImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		/*baseColorMetallnessImages_[i] = device_.CreateImage(
+			"BaseColorMetallness" + to_string(i),
+			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::ImageType::e2D,
+			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+			vk::Format::eR8G8B8A8Unorm,
+			vk::ImageLayout::eUndefined,
+			vk::ImageAspectFlagBits::eColor,
+			1,
+			1,
+			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+			colorSamplerInfo
+		);
+
+		normalRoughnessImages_[i] = device_.CreateImage(
+			"NormalRoughness" + to_string(i),
+			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::ImageType::e2D,
+			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+			vk::Format::eR8G8B8A8Unorm,
+			vk::ImageLayout::eUndefined,
+			vk::ImageAspectFlagBits::eColor,
+			1,
+			1,
+			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+			colorSamplerInfo
+		);
+
+		emissiveAOImages_[i] = device_.CreateImage(
+			"EmissiveAO" + to_string(i),
+			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::ImageType::e2D,
+			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+			vk::Format::eR8G8B8A8Unorm,
+			vk::ImageLayout::eUndefined,
+			vk::ImageAspectFlagBits::eColor,
+			1,
+			1,
+			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+			colorSamplerInfo
+		);
+
+		depthImages_[i] = device_.CreateImage(
+			"Depth" + to_string(i),
+			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::ImageType::e2D,
+			vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+			vk::Format::eD32Sfloat,
+			vk::ImageLayout::eUndefined,
+			vk::ImageAspectFlagBits::eDepth,
+			1,
+			1,
+			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+			depthSamplerInfo
+		);
+
+		renderImages_[i] = device_.CreateImage(
+			"Render" + to_string(i),
+			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::ImageType::e2D,
+			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+			vk::Format::eR16G16B16A16Sfloat,
+			vk::ImageLayout::eUndefined,
+			vk::ImageAspectFlagBits::eColor,
+			1,
+			1,
+			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+			colorSamplerInfo
+		);
+
+		toneMappedImages_[i] = device_.CreateImage(
+			"toneMapped" + to_string(i),
+			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::ImageType::e2D,
+			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+			vk::Format::eR16G16B16A16Sfloat,
+			vk::ImageLayout::eUndefined,
+			vk::ImageAspectFlagBits::eColor,
+			1,
+			1,
+			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+			colorSamplerInfo
+		);*/
+	}
+
 	swapchain_->Recreate(width, height);
 	geometryFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
 	lightingFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+	skyboxFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+	toneMapFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
 	presentFrameBuffer_->Recreate(width, height);
 
 	geometryDescriptorSets_.clear();
 	lightingDescriptorSets_.clear();
 	gltfGeomDescriptorSets_.clear();
 	gltfLightDescriptorSets_.clear();
+	skyboxDescriptorSets_.clear();
+	toneMapDescriptorSets_.clear();
 	guiDescriptorSets_.clear();
 	geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
 	lightingDescriptorSets_.resize(swapchain_->GetInflightCount());
 	gltfGeomDescriptorSets_.resize(swapchain_->GetInflightCount());
 	gltfLightDescriptorSets_.resize(swapchain_->GetInflightCount());
+	skyboxDescriptorSets_.resize(swapchain_->GetInflightCount());
+	toneMapDescriptorSets_.resize(swapchain_->GetInflightCount());
 	guiDescriptorSets_.resize(swapchain_->GetInflightCount());
 	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
 		geometryDescriptorSets_[i] = device_.CreateDescriptorSet({
@@ -1098,6 +1274,12 @@ void App::OnResize(unsigned int width, unsigned int height)
 			}
 			);
 
+		skyboxDescriptorSets_[i] = device_.CreateDescriptorSet({
+			{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			{ envMap_->GetEnvMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			}
+			);
+
 		toneMapDescriptorSets_[i] = device_.CreateDescriptorSet({
 			{ renderImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
 			}
@@ -1123,6 +1305,16 @@ void App::OnResize(unsigned int width, unsigned int height)
 	gltfLightPipeline_ = device_.CreateGraphicsPipeline(
 		lightingRenderPass_, swapchain_, gltfLightVertShader_, gltfLightPixelShader_,
 		gltfLightDescriptorSets_[0]
+	);
+
+	skyboxPipeline_ = device_.CreateGraphicsPipeline(
+		skyboxRenderPass_, swapchain_, skyboxVertShader_, skyboxPixelShader_,
+		skyboxDescriptorSets_[0], {}, false
+	);
+
+	toneMapPipeline_ = device_.CreateGraphicsPipeline(
+		toneMapRenderPass_, swapchain_, toneMapVertShader_, toneMapPixelShader_,
+		toneMapDescriptorSets_[0]
 	);
 }
 

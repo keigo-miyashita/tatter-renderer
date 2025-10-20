@@ -328,6 +328,15 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
         );
 
         pCommandBuffer->ImageBarrier(
+            irradianceMap_,
+            vk::ImageLayout::eGeneral,
+            vk::ImageLayout::eShaderReadOnlyOptimal,
+            vk::PipelineStageFlagBits::eComputeShader,
+            vk::PipelineStageFlagBits::eVertexShader | vk::PipelineStageFlagBits::eFragmentShader,
+            vk::AccessFlagBits::eShaderWrite,
+            vk::AccessFlagBits::eShaderRead
+        );
+        pCommandBuffer->ImageBarrier(
             prefilterMap_,
             vk::ImageLayout::eGeneral,
             vk::ImageLayout::eShaderReadOnlyOptimal,
