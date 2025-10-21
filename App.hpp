@@ -17,6 +17,15 @@ struct DetailCamera
 	float farZ;
 };
 
+enum GuiDir : int
+{
+	None		= 0x00000000,
+	Left		= 0x00000001,
+	Right		= 0x00000010,
+	Up			= 0x00000100,
+	Down		= 0x00001000
+};
+
 struct Light
 {
 	glm::vec4 pos;
@@ -109,6 +118,12 @@ private:
 
 	float sceneViewScaleX_ = 0.8f;
 	float sceneViewScaleY_ = 0.7f;
+
+	float edgeThreshold_ = 20.0f; // ÉäÉTÉCÉYñ≥å¯ïù
+	std::array<int, 9> dir_ = { -1 /*None*/, 0/*Left*/, 1/*Right*/, 2/*Up*/, 3/*Down*/, 4/*UpLeft*/, 5/*UpRight*/, 6/*DownLeft*/, 7/*DownRight*/ };
+	int catchSceneDir_ = -1;
+	int catchPanelDir_ = -1;
+	int catchFilePanelDir_ = -1;
 
 	uint32_t sceneWidth_ = windowWidth_ * sceneViewScaleX_;
 	uint32_t sceneHeight_ = windowHeight_ * sceneViewScaleY_;

@@ -559,19 +559,6 @@ void App::OnUpdate()
 
 		device_.WaitIdle(QueueContextType::General);
 
-		/*baseColorMetallnessImages_.clear();
-		normalRoughnessImages_.clear();
-		emissiveAOImages_.clear();
-		depthImages_.clear();
-		renderImages_.clear();
-		toneMappedImages_.clear();
-
-		baseColorMetallnessImages_.resize(swapchain_->GetInflightCount());
-		normalRoughnessImages_.resize(swapchain_->GetInflightCount());
-		emissiveAOImages_.resize(swapchain_->GetInflightCount());
-		depthImages_.resize(swapchain_->GetInflightCount());
-		renderImages_.resize(swapchain_->GetInflightCount());
-		toneMappedImages_.resize(swapchain_->GetInflightCount());*/
 		vk::SamplerCreateInfo colorSamplerInfo;
 		colorSamplerInfo
 			.setMagFilter(vk::Filter::eLinear)
@@ -614,89 +601,6 @@ void App::OnUpdate()
 			depthImages_[i]->Recreate(sceneWidth_, sceneHeight_);
 			renderImages_[i]->Recreate(sceneWidth_, sceneHeight_);
 			toneMappedImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-			/*baseColorMetallnessImages_[i] = device_.CreateImage(
-				"BaseColorMetallness" + to_string(i),
-				vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-				vk::ImageType::e2D,
-				vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-				vk::Format::eR8G8B8A8Unorm,
-				vk::ImageLayout::eUndefined,
-				vk::ImageAspectFlagBits::eColor,
-				1,
-				1,
-				vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-				colorSamplerInfo
-			);
-
-			normalRoughnessImages_[i] = device_.CreateImage(
-				"NormalRoughness" + to_string(i),
-				vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-				vk::ImageType::e2D,
-				vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-				vk::Format::eR8G8B8A8Unorm,
-				vk::ImageLayout::eUndefined,
-				vk::ImageAspectFlagBits::eColor,
-				1,
-				1,
-				vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-				colorSamplerInfo
-			);
-
-			emissiveAOImages_[i] = device_.CreateImage(
-				"EmissiveAO" + to_string(i),
-				vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-				vk::ImageType::e2D,
-				vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-				vk::Format::eR8G8B8A8Unorm,
-				vk::ImageLayout::eUndefined,
-				vk::ImageAspectFlagBits::eColor,
-				1,
-				1,
-				vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-				colorSamplerInfo
-			);
-
-			depthImages_[i] = device_.CreateImage(
-				"Depth" + to_string(i),
-				vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-				vk::ImageType::e2D,
-				vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-				vk::Format::eD32Sfloat,
-				vk::ImageLayout::eUndefined,
-				vk::ImageAspectFlagBits::eDepth,
-				1,
-				1,
-				vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-				depthSamplerInfo
-			);
-
-			renderImages_[i] = device_.CreateImage(
-				"Render" + to_string(i),
-				vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-				vk::ImageType::e2D,
-				vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-				vk::Format::eR16G16B16A16Sfloat,
-				vk::ImageLayout::eUndefined,
-				vk::ImageAspectFlagBits::eColor,
-				1,
-				1,
-				vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-				colorSamplerInfo
-			);
-
-			toneMappedImages_[i] = device_.CreateImage(
-				"toneMapped" + to_string(i),
-				vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-				vk::ImageType::e2D,
-				vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-				vk::Format::eR16G16B16A16Sfloat,
-				vk::ImageLayout::eUndefined,
-				vk::ImageAspectFlagBits::eColor,
-				1,
-				1,
-				vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-				colorSamplerInfo
-			);*/
 		}
 
 		swapchain_->Recreate(windowWidth_, windowHeight_);
@@ -834,40 +738,6 @@ void App::OnUpdate()
 		vk::AccessFlagBits::eDepthStencilAttachmentWrite
 	);
 
-	/*commandBuffer->ImageBarrier(
-		geometryFrameBuffer_->GetAttachmentImage(3, infligtIndex),
-		vk::ImageLayout::eUndefined,
-		vk::ImageLayout::eTransferDstOptimal,
-		vk::PipelineStageFlagBits::eTopOfPipe,
-		vk::PipelineStageFlagBits::eTransfer,
-		{},
-		vk::AccessFlagBits::eTransferWrite
-	);
-
-	vk::ClearDepthStencilValue clearValue(1.0f, 0);
-	vk::ImageSubresourceRange range(
-		vk::ImageAspectFlagBits::eDepth,
-		0, 1, 0, 1
-	);
-
-	commandBuffer->GetCommandBuffer().clearDepthStencilImage(
-		geometryFrameBuffer_->GetAttachmentImage(3, infligtIndex)->GetImage(),
-		vk::ImageLayout::eTransferDstOptimal,
-		clearValue,
-		range
-	);*/
-
-	/*commandBuffer->ImageBarrier(
-		geometryFrameBuffer_->GetAttachmentImage(3, infligtIndex),
-		vk::ImageLayout::eTransferDstOptimal,
-		vk::ImageLayout::eDepthStencilAttachmentOptimal,
-		vk::PipelineStageFlagBits::eTopOfPipe,
-		vk::PipelineStageFlagBits::eEarlyFragmentTests,
-		{},
-		vk::AccessFlagBits::eDepthStencilAttachmentWrite
-	);*/
-
-
 	commandBuffer->BeginRenderPass(geometryRenderPass_, geometryFrameBuffer_, infligtIndex);
 	commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
 	commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
@@ -969,13 +839,71 @@ void App::OnUpdate()
 
 	ImGuizmo::BeginFrame();
 
+	ImGuiWindowFlags sceneWindowFlag = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus;
+	if (catchSceneDir_ & GuiDir::Left || catchSceneDir_ & GuiDir::Up || catchSceneDir_ & (GuiDir::Down | GuiDir::Left) || catchSceneDir_ & (GuiDir::Down | GuiDir::Right))
+	{
+		/*if (catchSceneDir_ == GuiDir::Left) {
+			cout << "catchSceneDir_ == ImGuiDir_Left" << endl << endl << endl << endl << endl << endl << endl << endl;
+		}
+		if (catchSceneDir_ == GuiDir::Up) {
+			cout << "catchSceneDir_ == ImGuiDir_Up" << endl << endl << endl << endl << endl << endl << endl << endl;
+		}*/
+		sceneWindowFlag |= ImGuiWindowFlags_NoResize;
+	}
+	else
+	{
+		sceneWindowFlag &= ~ImGuiWindowFlags_NoResize;
+	}
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::SetNextWindowPos(ImVec2(0, 0));
 	ImGui::SetNextWindowSize(ImVec2(sceneWidth_, sceneHeight_));
-	ImGui::Begin("Scene View", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
+	ImGui::Begin("Scene View", nullptr, sceneWindowFlag);
+
+	// ----- NOTE : using internal ImGui API -----
+	//ImGuiWindow* imguiSceneWindow = ImGui::GetCurrentWindowRead();
+
+	//if (imguiSceneWindow->ResizeBorderHeld != -1)
+	//{
+	//	// リサイズ中
+	//	switch (imguiSceneWindow->ResizeBorderHeld)
+	//	{
+	//	case ImGuiDir_Left:  catchSceneDir_ = ImGuiDir_Left;	break;
+	//	case ImGuiDir_Right: catchSceneDir_ = ImGuiDir_Right;	break;
+	//	case ImGuiDir_Up:    catchSceneDir_ = ImGuiDir_Up;		break;
+	//	case ImGuiDir_Down:  catchSceneDir_ = ImGuiDir_Down;	break;
+	//	}
+	//}
+	//else
+	//{
+	//	catchSceneDir_ = ImGuiDir_None;
+	//}
+	// -------------------------------------------
 	ImVec2 size = ImGui::GetWindowSize();
 	if (ImGui::IsWindowHovered()) {
 		Input::SetCatchInput(true);
+	}
+
+	ImVec2 pos = ImGui::GetWindowPos();
+	ImVec2 mouse = ImGui::GetIO().MousePos;
+
+	bool onSceneLeft = fabs(mouse.x - pos.x) < edgeThreshold_;
+	bool onSceneRight = fabs(mouse.x - (pos.x + size.x)) < edgeThreshold_;
+	bool onSceneTop = fabs(mouse.y - pos.y) < edgeThreshold_;
+	bool onSceneBottom = fabs(mouse.y - (pos.y + size.y)) < edgeThreshold_;
+
+	catchSceneDir_ = GuiDir::None;
+	if (ImGui::IsMouseDown(0)) {
+		if (onSceneLeft)					catchSceneDir_ |= GuiDir::Left;
+		if (onSceneRight)					catchSceneDir_ |= GuiDir::Right;
+		if (onSceneTop)						catchSceneDir_ |= GuiDir::Up;
+		if (onSceneBottom)					catchSceneDir_ |= GuiDir::Down;
+		/*if (onSceneTop && onSceneLeft)      catchSceneDir_ = GuiDir::UpLeft;
+		if (onSceneTop && onSceneRight)     catchSceneDir_ = GuiDir::UpRight;
+		if (onSceneBottom && onSceneLeft)	catchSceneDir_ = GuiDir::DownLeft;
+		if (onSceneBottom && onSceneRight)	catchSceneDir_ = GuiDir::DownRight;*/
+	}
+	else {
+		catchSceneDir_ = GuiDir::None;
 	}
 	changedSceneWidth_ = size.x;
 	changedSceneHeight_ = size.y;
@@ -1000,12 +928,63 @@ void App::OnUpdate()
 	// 2. ツールパネル描画（横に並べる）
 	float position[] = {0.2f, 0.2f, 0.2f};
 	float rotation[] = {0.2f, 0.2f, 0.2f};
+	ImGuiWindowFlags panelWindowFlag = ImGuiWindowFlags_NoCollapse;
+	if ((catchPanelDir_ & GuiDir::Right) || (catchPanelDir_ & GuiDir::Up) || (catchPanelDir_ & GuiDir::Down))
+	{
+		panelWindowFlag |= ImGuiWindowFlags_NoResize;
+	}
+	else
+	{
+		panelWindowFlag &= ~ImGuiWindowFlags_NoResize;
+	}
 	ImGui::SetNextWindowPos(ImVec2(sceneWidth_, 0));
 	ImGui::SetNextWindowSize(ImVec2(panelWidth_, windowHeight_));
-	ImGui::Begin("Inspector", nullptr, ImGuiWindowFlags_NoCollapse);
+	ImGui::Begin("Inspector", nullptr, panelWindowFlag);
+	// ----- NOTE : using internal ImGui API -----
+	//ImGuiWindow* imguiPanelWindow = ImGui::GetCurrentWindowRead();
+
+	//if (imguiPanelWindow->ResizeBorderHeld != -1)
+	//{
+	//	cout << "Resizing File Panel" << endl;
+	//	// リサイズ中
+	//	switch (imguiPanelWindow->ResizeBorderHeld)
+	//	{
+	//	case ImGuiDir_Left:  catchPanelDir_ = ImGuiDir_Left;	cout << "FilePanel Left";	break;
+	//	case ImGuiDir_Right: catchPanelDir_ = ImGuiDir_Right;	cout << "FilePanel Right";	break;
+	//	case ImGuiDir_Up:    catchPanelDir_ = ImGuiDir_Up;		cout << "FilePanel Up";	break;
+	//	case ImGuiDir_Down:  catchPanelDir_ = ImGuiDir_Down;	cout << "FilePanel Down";	break;
+	//	}
+	//}
+	//else
+	//{
+	//	catchPanelDir_ = ImGuiDir_None;
+	//}
+	// -------------------------------------------
 	size = ImGui::GetWindowSize();
 	if (ImGui::IsWindowHovered()) {
 		Input::SetCatchInput(false);
+	}
+	pos = ImGui::GetWindowPos();
+	mouse = ImGui::GetIO().MousePos;
+
+	bool onPanelLeft = fabs(mouse.x - pos.x) < edgeThreshold_;
+	bool onPanelRight = fabs(mouse.x - (pos.x + size.x)) < edgeThreshold_;
+	bool onPanelTop = fabs(mouse.y - pos.y) < edgeThreshold_;
+	bool onPanelBottom = fabs(mouse.y - (pos.y + size.y)) < edgeThreshold_;
+
+	catchPanelDir_ = GuiDir::None;
+	if (ImGui::IsMouseDown(0)) {
+		if (onPanelLeft)					catchPanelDir_ |= GuiDir::Left;
+		if (onPanelRight)					catchPanelDir_ |= GuiDir::Right;
+		if (onPanelTop)						catchPanelDir_ |= GuiDir::Up;
+		if (onPanelBottom)					catchPanelDir_ |= GuiDir::Down;
+		/*if (onSceneTop && onSceneLeft)      catchSceneDir_ = GuiDir::UpLeft;
+		if (onSceneTop && onSceneRight)     catchSceneDir_ = GuiDir::UpRight;
+		if (onSceneBottom && onSceneLeft)	catchSceneDir_ = GuiDir::DownLeft;
+		if (onSceneBottom && onSceneRight)	catchSceneDir_ = GuiDir::DownRight;*/
+	}
+	else {
+		catchPanelDir_ = GuiDir::None;
 	}
 	changedPanelWidth_ = size.x;
 	changedPanelHeight_ = size.y;
@@ -1015,12 +994,64 @@ void App::OnUpdate()
 	ImGui::End();
 
 	// 3. ファイルツールパネル描画（縦に並べる）
+	ImGuiWindowFlags filePanelWindowFlag = ImGuiWindowFlags_NoCollapse;
+	if (catchFilePanelDir_ & GuiDir::Left || catchFilePanelDir_ & GuiDir::Down)
+	{
+		cout << "No Resizing File Panel" << endl;
+		filePanelWindowFlag |= ImGuiWindowFlags_NoResize;
+	}
+	else
+	{
+		filePanelWindowFlag &= ~ImGuiWindowFlags_NoResize;
+	}
 	ImGui::SetNextWindowPos(ImVec2(0, sceneHeight_));
 	ImGui::SetNextWindowSize(ImVec2(filePanelWidth_, filePanelHeight_));
-	ImGui::Begin("Test", nullptr, ImGuiWindowFlags_NoCollapse);
+	ImGui::Begin("Test", nullptr, filePanelWindowFlag);
+	// ----- NOTE : using internal ImGui API -----
+	//ImGuiWindow* imguiFilePanelWindow = ImGui::GetCurrentWindowRead();
+
+	//if (imguiFilePanelWindow->ResizeBorderHeld != -1)
+	//{
+	//	// リサイズ中
+	//	switch (imguiFilePanelWindow->ResizeBorderHeld)
+	//	{
+	//	case ImGuiDir_Left:  catchFilePanelDir_ = ImGuiDir_Left;	cout << "FilePanel Left";	break;
+	//	case ImGuiDir_Right: catchFilePanelDir_ = ImGuiDir_Right;	cout << "FilePanel Right";	break;
+	//	case ImGuiDir_Up:    catchFilePanelDir_ = ImGuiDir_Up;		cout << "FilePanel Up";	break;
+	//	case ImGuiDir_Down:  catchFilePanelDir_ = ImGuiDir_Down;	cout << "FilePanel Down";	break;
+	//	}
+	//}
+	//else
+	//{
+	//	catchFilePanelDir_ = ImGuiDir_None;
+	//}
+	// -------------------------------------------
 	size = ImGui::GetWindowSize();
 	if (ImGui::IsWindowHovered()) {
 		Input::SetCatchInput(false);
+	}
+
+	pos = ImGui::GetWindowPos();
+	mouse = ImGui::GetIO().MousePos;
+
+	bool onFilePanelLeft = fabs(mouse.x - pos.x) < edgeThreshold_;
+	bool onFilePanelRight = fabs(mouse.x - (pos.x + size.x)) < edgeThreshold_;
+	bool onFilePanelTop = fabs(mouse.y - pos.y) < edgeThreshold_;
+	bool onFilePanelBottom = fabs(mouse.y - (pos.y + size.y)) < edgeThreshold_;
+
+	catchFilePanelDir_ = GuiDir::None;
+	if (ImGui::IsMouseDown(0)) {
+		if (onFilePanelLeft)					catchFilePanelDir_ |= GuiDir::Left;
+		if (onFilePanelRight)					catchFilePanelDir_ |= GuiDir::Right;
+		if (onFilePanelTop)						catchFilePanelDir_ |= GuiDir::Up;
+		if (onFilePanelBottom)					catchFilePanelDir_ |= GuiDir::Down;
+		/*if (onSceneTop && onSceneLeft)      catchSceneDir_ = GuiDir::UpLeft;
+		if (onSceneTop && onSceneRight)     catchSceneDir_ = GuiDir::UpRight;
+		if (onSceneBottom && onSceneLeft)	catchSceneDir_ = GuiDir::DownLeft;
+		if (onSceneBottom && onSceneRight)	catchSceneDir_ = GuiDir::DownRight;*/
+	}
+	else {
+		catchFilePanelDir_ = GuiDir::None;
 	}
 	changedFilePanelWidth_ = size.x;
 	changedFilePanelHeight_ = size.y;
@@ -1063,19 +1094,6 @@ void App::OnResize(unsigned int width, unsigned int height)
 
 	device_.WaitIdle(QueueContextType::General);
 
-	/*baseColorMetallnessImages_.clear();
-	normalRoughnessImages_.clear();
-	emissiveAOImages_.clear();
-	depthImages_.clear();
-	renderImages_.clear();
-	toneMappedImages_.clear();
-
-	baseColorMetallnessImages_.resize(swapchain_->GetInflightCount());
-	normalRoughnessImages_.resize(swapchain_->GetInflightCount());
-	emissiveAOImages_.resize(swapchain_->GetInflightCount());
-	depthImages_.resize(swapchain_->GetInflightCount());
-	renderImages_.resize(swapchain_->GetInflightCount());
-	toneMappedImages_.resize(swapchain_->GetInflightCount());*/
 	vk::SamplerCreateInfo colorSamplerInfo;
 	colorSamplerInfo
 		.setMagFilter(vk::Filter::eLinear)
@@ -1118,89 +1136,6 @@ void App::OnResize(unsigned int width, unsigned int height)
 		depthImages_[i]->Recreate(sceneWidth_, sceneHeight_);
 		renderImages_[i]->Recreate(sceneWidth_, sceneHeight_);
 		toneMappedImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-		/*baseColorMetallnessImages_[i] = device_.CreateImage(
-			"BaseColorMetallness" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-			vk::ImageType::e2D,
-			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-			vk::Format::eR8G8B8A8Unorm,
-			vk::ImageLayout::eUndefined,
-			vk::ImageAspectFlagBits::eColor,
-			1,
-			1,
-			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-			colorSamplerInfo
-		);
-
-		normalRoughnessImages_[i] = device_.CreateImage(
-			"NormalRoughness" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-			vk::ImageType::e2D,
-			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-			vk::Format::eR8G8B8A8Unorm,
-			vk::ImageLayout::eUndefined,
-			vk::ImageAspectFlagBits::eColor,
-			1,
-			1,
-			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-			colorSamplerInfo
-		);
-
-		emissiveAOImages_[i] = device_.CreateImage(
-			"EmissiveAO" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-			vk::ImageType::e2D,
-			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-			vk::Format::eR8G8B8A8Unorm,
-			vk::ImageLayout::eUndefined,
-			vk::ImageAspectFlagBits::eColor,
-			1,
-			1,
-			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-			colorSamplerInfo
-		);
-
-		depthImages_[i] = device_.CreateImage(
-			"Depth" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-			vk::ImageType::e2D,
-			vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-			vk::Format::eD32Sfloat,
-			vk::ImageLayout::eUndefined,
-			vk::ImageAspectFlagBits::eDepth,
-			1,
-			1,
-			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-			depthSamplerInfo
-		);
-
-		renderImages_[i] = device_.CreateImage(
-			"Render" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-			vk::ImageType::e2D,
-			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-			vk::Format::eR16G16B16A16Sfloat,
-			vk::ImageLayout::eUndefined,
-			vk::ImageAspectFlagBits::eColor,
-			1,
-			1,
-			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-			colorSamplerInfo
-		);
-
-		toneMappedImages_[i] = device_.CreateImage(
-			"toneMapped" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
-			vk::ImageType::e2D,
-			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-			vk::Format::eR16G16B16A16Sfloat,
-			vk::ImageLayout::eUndefined,
-			vk::ImageAspectFlagBits::eColor,
-			1,
-			1,
-			vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-			colorSamplerInfo
-		);*/
 	}
 
 	swapchain_->Recreate(width, height);
