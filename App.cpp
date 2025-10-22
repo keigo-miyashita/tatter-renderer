@@ -842,12 +842,6 @@ void App::OnUpdate()
 	ImGuiWindowFlags sceneWindowFlag = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus;
 	if (catchSceneDir_ & GuiDir::Left || catchSceneDir_ & GuiDir::Up || catchSceneDir_ & (GuiDir::Down | GuiDir::Left) || catchSceneDir_ & (GuiDir::Down | GuiDir::Right))
 	{
-		/*if (catchSceneDir_ == GuiDir::Left) {
-			cout << "catchSceneDir_ == ImGuiDir_Left" << endl << endl << endl << endl << endl << endl << endl << endl;
-		}
-		if (catchSceneDir_ == GuiDir::Up) {
-			cout << "catchSceneDir_ == ImGuiDir_Up" << endl << endl << endl << endl << endl << endl << endl << endl;
-		}*/
 		sceneWindowFlag |= ImGuiWindowFlags_NoResize;
 	}
 	else
@@ -859,25 +853,6 @@ void App::OnUpdate()
 	ImGui::SetNextWindowSize(ImVec2(sceneWidth_, sceneHeight_));
 	ImGui::Begin("Scene View", nullptr, sceneWindowFlag);
 
-	// ----- NOTE : using internal ImGui API -----
-	//ImGuiWindow* imguiSceneWindow = ImGui::GetCurrentWindowRead();
-
-	//if (imguiSceneWindow->ResizeBorderHeld != -1)
-	//{
-	//	// リサイズ中
-	//	switch (imguiSceneWindow->ResizeBorderHeld)
-	//	{
-	//	case ImGuiDir_Left:  catchSceneDir_ = ImGuiDir_Left;	break;
-	//	case ImGuiDir_Right: catchSceneDir_ = ImGuiDir_Right;	break;
-	//	case ImGuiDir_Up:    catchSceneDir_ = ImGuiDir_Up;		break;
-	//	case ImGuiDir_Down:  catchSceneDir_ = ImGuiDir_Down;	break;
-	//	}
-	//}
-	//else
-	//{
-	//	catchSceneDir_ = ImGuiDir_None;
-	//}
-	// -------------------------------------------
 	ImVec2 size = ImGui::GetWindowSize();
 	if (ImGui::IsWindowHovered()) {
 		Input::SetCatchInput(true);
@@ -897,10 +872,6 @@ void App::OnUpdate()
 		if (onSceneRight)					catchSceneDir_ |= GuiDir::Right;
 		if (onSceneTop)						catchSceneDir_ |= GuiDir::Up;
 		if (onSceneBottom)					catchSceneDir_ |= GuiDir::Down;
-		/*if (onSceneTop && onSceneLeft)      catchSceneDir_ = GuiDir::UpLeft;
-		if (onSceneTop && onSceneRight)     catchSceneDir_ = GuiDir::UpRight;
-		if (onSceneBottom && onSceneLeft)	catchSceneDir_ = GuiDir::DownLeft;
-		if (onSceneBottom && onSceneRight)	catchSceneDir_ = GuiDir::DownRight;*/
 	}
 	else {
 		catchSceneDir_ = GuiDir::None;
@@ -922,7 +893,16 @@ void App::OnUpdate()
 	ImGui::End();
 	ImGuizmo::ViewManipulate(glm::value_ptr(view), 1.0f, ImVec2(sceneWidth_ / 6.0f * 5, sceneTitleBarHeight), ImVec2(sceneWidth_ / 6.0f, sceneHeight_ / 6.0f), 0x10101010);
 	glm::quat qCamera = glm::quat_cast(glm::transpose(glm::mat3(view)));
-	/*camera_.SetRotation(glm::vec3(glm::eulerAngles(qCamera)));*/
+	// Using ImGui::GetWindowWidth() returns default value, (400, 400), when no resize
+	//ImVec2 gizmoPos = ImVec2(ImGui::GetWindowPos().x + sceneWidth_ - sceneWidth_ / 6.0f, ImGui::GetWindowPos().y);
+	ImVec2 gizmoPos = ImVec2(sceneWidth_ - sceneWidth_ / 6.0f, 0.0f);
+	ImVec2 gizmoSize = ImVec2(sceneWidth_ / 6.0f, sceneHeight_ / 6.0f);
+	bool isMouseOverViewCube =
+		(mouse.x >= gizmoPos.x && mouse.x <= gizmoPos.x + gizmoSize.x) &&
+		(mouse.y >= gizmoPos.y && mouse.y <= gizmoPos.y + gizmoSize.y);
+	if (isMouseOverViewCube) {
+		Input::SetCatchInput(false);
+	}
 	ImGui::PopStyleVar();
 
 	// 2. ツールパネル描画（横に並べる）
@@ -940,26 +920,6 @@ void App::OnUpdate()
 	ImGui::SetNextWindowPos(ImVec2(sceneWidth_, 0));
 	ImGui::SetNextWindowSize(ImVec2(panelWidth_, windowHeight_));
 	ImGui::Begin("Inspector", nullptr, panelWindowFlag);
-	// ----- NOTE : using internal ImGui API -----
-	//ImGuiWindow* imguiPanelWindow = ImGui::GetCurrentWindowRead();
-
-	//if (imguiPanelWindow->ResizeBorderHeld != -1)
-	//{
-	//	cout << "Resizing File Panel" << endl;
-	//	// リサイズ中
-	//	switch (imguiPanelWindow->ResizeBorderHeld)
-	//	{
-	//	case ImGuiDir_Left:  catchPanelDir_ = ImGuiDir_Left;	cout << "FilePanel Left";	break;
-	//	case ImGuiDir_Right: catchPanelDir_ = ImGuiDir_Right;	cout << "FilePanel Right";	break;
-	//	case ImGuiDir_Up:    catchPanelDir_ = ImGuiDir_Up;		cout << "FilePanel Up";	break;
-	//	case ImGuiDir_Down:  catchPanelDir_ = ImGuiDir_Down;	cout << "FilePanel Down";	break;
-	//	}
-	//}
-	//else
-	//{
-	//	catchPanelDir_ = ImGuiDir_None;
-	//}
-	// -------------------------------------------
 	size = ImGui::GetWindowSize();
 	if (ImGui::IsWindowHovered()) {
 		Input::SetCatchInput(false);
@@ -978,10 +938,6 @@ void App::OnUpdate()
 		if (onPanelRight)					catchPanelDir_ |= GuiDir::Right;
 		if (onPanelTop)						catchPanelDir_ |= GuiDir::Up;
 		if (onPanelBottom)					catchPanelDir_ |= GuiDir::Down;
-		/*if (onSceneTop && onSceneLeft)      catchSceneDir_ = GuiDir::UpLeft;
-		if (onSceneTop && onSceneRight)     catchSceneDir_ = GuiDir::UpRight;
-		if (onSceneBottom && onSceneLeft)	catchSceneDir_ = GuiDir::DownLeft;
-		if (onSceneBottom && onSceneRight)	catchSceneDir_ = GuiDir::DownRight;*/
 	}
 	else {
 		catchPanelDir_ = GuiDir::None;
@@ -1007,25 +963,6 @@ void App::OnUpdate()
 	ImGui::SetNextWindowPos(ImVec2(0, sceneHeight_));
 	ImGui::SetNextWindowSize(ImVec2(filePanelWidth_, filePanelHeight_));
 	ImGui::Begin("Test", nullptr, filePanelWindowFlag);
-	// ----- NOTE : using internal ImGui API -----
-	//ImGuiWindow* imguiFilePanelWindow = ImGui::GetCurrentWindowRead();
-
-	//if (imguiFilePanelWindow->ResizeBorderHeld != -1)
-	//{
-	//	// リサイズ中
-	//	switch (imguiFilePanelWindow->ResizeBorderHeld)
-	//	{
-	//	case ImGuiDir_Left:  catchFilePanelDir_ = ImGuiDir_Left;	cout << "FilePanel Left";	break;
-	//	case ImGuiDir_Right: catchFilePanelDir_ = ImGuiDir_Right;	cout << "FilePanel Right";	break;
-	//	case ImGuiDir_Up:    catchFilePanelDir_ = ImGuiDir_Up;		cout << "FilePanel Up";	break;
-	//	case ImGuiDir_Down:  catchFilePanelDir_ = ImGuiDir_Down;	cout << "FilePanel Down";	break;
-	//	}
-	//}
-	//else
-	//{
-	//	catchFilePanelDir_ = ImGuiDir_None;
-	//}
-	// -------------------------------------------
 	size = ImGui::GetWindowSize();
 	if (ImGui::IsWindowHovered()) {
 		Input::SetCatchInput(false);
@@ -1045,10 +982,6 @@ void App::OnUpdate()
 		if (onFilePanelRight)					catchFilePanelDir_ |= GuiDir::Right;
 		if (onFilePanelTop)						catchFilePanelDir_ |= GuiDir::Up;
 		if (onFilePanelBottom)					catchFilePanelDir_ |= GuiDir::Down;
-		/*if (onSceneTop && onSceneLeft)      catchSceneDir_ = GuiDir::UpLeft;
-		if (onSceneTop && onSceneRight)     catchSceneDir_ = GuiDir::UpRight;
-		if (onSceneBottom && onSceneLeft)	catchSceneDir_ = GuiDir::DownLeft;
-		if (onSceneBottom && onSceneRight)	catchSceneDir_ = GuiDir::DownRight;*/
 	}
 	else {
 		catchFilePanelDir_ = GuiDir::None;
