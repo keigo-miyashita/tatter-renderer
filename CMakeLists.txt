@@ -10,11 +10,13 @@ add_subdirectory(sqrap-vk)
 
 find_package(Stb REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
+find_package(nfd CONFIG REQUIRED)
 
 target_link_libraries(
 	${PROJECT_NAME} PUBLIC
 	sqrap-vk
 	imguizmo::imguizmo
+	nfd::nfd
 )
 
 target_include_directories(

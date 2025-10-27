@@ -14,20 +14,42 @@ layout(std140, set = 0, binding = 0) uniform CameraDetail
     float farZ;
 } camera;
 
-layout(std140, set = 0, binding = 1) uniform Light
+layout(std140, set = 0, binding = 1) uniform Object
+{
+	// add model uniforms here
+	mat4 model;
+	mat4 ITModel;
+} object;
+
+layout(std140, set = 0, binding = 2) uniform Light
 {
 	vec4 lightPos;
 	vec4 lightColor;
 } light;
 
+layout(set = 0, binding = 3) uniform sampler2D baseColorTexture;
+
+layout(set = 0, binding = 4) uniform sampler2D metallicRoughnessTexture;
+
+layout(set = 0, binding = 5) uniform sampler2D normalTexture;
+
+layout(set = 0, binding = 6) uniform sampler2D occlusionTexture;
+
+layout(set = 0, binding = 7) uniform sampler2D emissiveTexture;
+
 // G-Buffer サンプラー
-layout(set = 0, binding = 2) uniform sampler2D gBaseColorMetallness;
-layout(set = 0, binding = 3) uniform sampler2D gNormalRoughness;
-layout(set = 0, binding = 4) uniform sampler2D gEmissiveAO;
-layout(set = 0, binding = 5) uniform sampler2D gDepth;
-layout(set = 0, binding = 6) uniform samplerCube irradianceMap;
-layout(set = 0, binding = 7) uniform samplerCube prefilterMap;
-layout(set = 0, binding = 8) uniform sampler2D brdfLUT;
+layout(set = 0, binding = 8) uniform samplerCube irradianceMap;
+layout(set = 0, binding = 9) uniform samplerCube prefilterMap;
+layout(set = 0, binding = 10) uniform sampler2D brdfLUT;
+
+layout(push_constant) uniform Factors
+{
+	vec4 baseColor;
+	vec3 emissive;
+	float padding;
+	float metallic;
+	float roughness;
+} factors;
 
 #ifdef GL_VERTEX_SHADER
 layout(location = 0) in vec4 vPosition;
@@ -35,56 +57,36 @@ layout(location = 1) in vec4 vNormal;
 layout(location = 2) in vec4 vTangent;
 layout(location = 3) in vec2 vUV;
 
-layout(location = 0) out vec2 fragUV;
+layout(location = 0) out vec4 fWorldPosition;
+layout(location = 1) out vec4 fNormal;
+layout(location = 2) out vec4 fTangent;
+layout(location = 3) out vec2 fUV;
 
 void main()
 {
-    // フルスクリーントライアングル（Y反転対応）
-    vec2 positions[3] = vec2[](
-        vec2(-1.0, -1.0), // 左下 NDC
-        vec2( 3.0, -1.0), // 右下 NDC
-        vec2(-1.0,  3.0)  // 左上 NDC
-    );
+	fWorldPosition = object.model * vPosition;
+	vec3 normal = normalize(object.ITModel * vNormal).rgb;
+	vec3 tangent = normalize(object.model * vTangent).rgb;
+	tangent = normalize(tangent - dot(tangent, normal) * normal);
+	vec3 bitangent = normalize(cross(normal, tangent)) * vTangent.w;
+	mat3 TBN = mat3(tangent, bitangent, normal);
 
-    gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
+	vec3 normalMap = texture(normalTexture, vUV).xyz * 2.0 - 1.0;
+	fNormal = vec4(normalize(TBN * normalMap), 0.0);  
 
-    // UV生成（Y反転補正）
-    fragUV = (gl_Position.xy * 0.5) + 0.5; // [-1,+1] → [0,1]
-    fragUV.y = 1.0 - fragUV.y;             // Y反転補正
+	fUV = vUV;
+
+	gl_Position = camera.proj * camera.view * fWorldPosition;
 }
 #endif
 
 #ifdef GL_FRAGMENT_SHADER
-layout(location = 0) in vec2 fragUV;
-layout(location = 0) out vec4 outColor;
+layout(location = 0) in vec4 fWorldPosition;
+layout(location = 1) in vec4 fNormal;
+layout(location = 2) in vec4 fTangent;
+layout(location = 3) in vec2 fUV;
 
-// NOTE : Check algorithm
-float LinearizeDepth(float depth, float nearZ, float farZ)
-{
-    return (nearZ * farZ) / (farZ - depth * (farZ - nearZ));
-}
-
-vec3 ReconstructWorldPosition(vec2 uv, float depth)
-{
-    // 1. NDC 空間に変換（x, y, z は -1 〜 1 の範囲）
-    vec3 ndc;
-    ndc.xy = uv * 2.0 - 1.0;       // [0,1] → [-1,1]
-    ndc.z  = depth * 2.0 - 1.0;    // [0,1] → [-1,1] (OpenGL の場合)
-
-    // 2. クリップ空間座標（同次座標 w = 1）に変換
-    vec4 clip = vec4(ndc, 1.0);
-
-    // 3. クリップ空間 → ビュー空間（投影行列の逆行列を掛ける）
-    vec4 view = camera.invProj * clip;
-
-    // 透視除算の逆（w で割る）
-    view /= view.w;
-
-    // 4. ビュー空間 → ワールド空間（ビュー行列の逆行列を掛ける）
-    vec4 world = camera.invView * view;
-
-    return world.xyz;
-}
+layout(location = 0) out vec4 outColor;   // Base Color + Metalness
 
 // ---------------------------
 // マイクロファセット関連関数（理論実装）
@@ -125,15 +127,14 @@ vec3 DiffuseLambert(vec3 diffuseColor) {
 
 void main()
 {
-    vec3 baseColor  = texture(gBaseColorMetallness, fragUV).rgb;
-    vec3 normal  = texture(gNormalRoughness, fragUV).rgb * 2.0f - 1.0f;
-    float metalic      = texture(gBaseColorMetallness, fragUV).a;
-    float roughness = texture(gNormalRoughness, fragUV).a;
-    float ao     = texture(gEmissiveAO, fragUV).a;
-    vec3 emissive = texture(gEmissiveAO, fragUV).rgb;
-    float depth = LinearizeDepth(texture(gDepth, fragUV).r, camera.nearZ, camera.farZ);
+    vec3 baseColor  = texture(baseColorTexture, fUV).rgb * factors.baseColor.rgb;
+    vec3 normal  = fNormal.rgb;
+    float metallic = texture(metallicRoughnessTexture, fUV).g * factors.metallic;
+    float roughness = texture(metallicRoughnessTexture, fUV).b * factors.roughness;
+    vec3 emissive = texture(emissiveTexture, fUV).rgb * factors.emissive;
+	float ao = texture(occlusionTexture, fUV).r;
 
-    vec3 worldPos = ReconstructWorldPosition(fragUV, depth);
+    vec3 worldPos = fWorldPosition.rgb;
 
     vec3 v = normalize(camera.position.xyz - worldPos);
     vec3 l = normalize(light.lightPos.xyz - worldPos);
@@ -146,8 +147,8 @@ void main()
     float VdotH = clamp(dot(v, h), 0.001, 1.0);
 
     vec3 dielectoricF0 = vec3(0.04); // 非金属のF0
-    vec3 specularColor = mix(dielectoricF0, baseColor, metalic);
-    vec3 diffuseColor = baseColor * (1.0 - metalic);
+    vec3 specularColor = mix(dielectoricF0, baseColor, metallic);
+    vec3 diffuseColor = baseColor * (1.0 - metallic);
 
     // フレネル項
     float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
@@ -164,7 +165,7 @@ void main()
 
     vec3 direct = NdotL * light.lightColor.rgb * (diffuseTerm + specularColorTerm);
 
-    vec3 diffuseIBL = texture(irradianceMap, normal).rgb * baseColor * (1.0 - metalic);
+    vec3 diffuseIBL = texture(irradianceMap, normal).rgb * baseColor * (1.0 - metallic);
     vec3 prefiltered = textureLod(prefilterMap, reflection, roughness * MAX_MIP_LEVEL).rgb;
     vec2 brdf = texture(brdfLUT, vec2(NdotV, roughness)).rg;
     vec3 specularIBL = prefiltered * (F0 * brdf.x + brdf.y);
@@ -173,11 +174,5 @@ void main()
     // NOTE : Add AO
 
     outColor = vec4(direct + emissive + LIBL, 1.0);
-    // outColor = vec4(worldPos, 1.0);
-    // outColor = vec4(depth,depth,depth, 1.0);
-    // float linearDepth = LinearizeDepth(depth, 0.1, 100.0); // near, farは適宜
-    // outColor = vec4(vec3(linearDepth / 100.0), 1.0);
-    // outColor = vec4(F, 1.0);
-    // outColor = vec4(diffuseTerm, 1.0);
 }
 #endif

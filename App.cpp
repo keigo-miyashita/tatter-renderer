@@ -3,6 +3,171 @@
 using namespace std;
 using namespace sqrp;
 
+void App::Recreate()
+{
+	device_.WaitIdle(QueueContextType::General);
+
+	vk::SamplerCreateInfo colorSamplerInfo;
+	colorSamplerInfo
+		.setMagFilter(vk::Filter::eLinear)
+		.setMinFilter(vk::Filter::eLinear)
+		.setMipmapMode(vk::SamplerMipmapMode::eNearest)
+		.setAddressModeU(vk::SamplerAddressMode::eClampToEdge)
+		.setAddressModeV(vk::SamplerAddressMode::eClampToEdge)
+		.setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
+		.setMipLodBias(0.0f)
+		.setAnisotropyEnable(VK_FALSE)
+		.setMaxAnisotropy(1.0f)
+		.setCompareEnable(VK_FALSE)
+		.setCompareOp(vk::CompareOp::eAlways)
+		.setMinLod(0.0f)
+		.setMaxLod(0.0f)
+		.setBorderColor(vk::BorderColor::eIntOpaqueWhite)
+		.setUnnormalizedCoordinates(VK_FALSE);
+	vk::SamplerCreateInfo depthSamplerInfo;
+	depthSamplerInfo
+		.setMagFilter(vk::Filter::eNearest)
+		.setMinFilter(vk::Filter::eNearest)
+		.setMipmapMode(vk::SamplerMipmapMode::eNearest)
+		.setAddressModeU(vk::SamplerAddressMode::eClampToEdge)
+		.setAddressModeV(vk::SamplerAddressMode::eClampToEdge)
+		.setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
+		.setMipLodBias(0.0f)
+		.setAnisotropyEnable(VK_FALSE)
+		.setMaxAnisotropy(1.0f)
+		.setCompareEnable(VK_FALSE)
+		.setCompareOp(vk::CompareOp::eAlways)
+		.setMinLod(0.0f)
+		.setMaxLod(0.0f)
+		.setBorderColor(vk::BorderColor::eIntOpaqueWhite)
+		.setUnnormalizedCoordinates(VK_FALSE);
+
+	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
+		baseColorMetallnessImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		normalRoughnessImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		emissiveAOImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		depthImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		renderImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		toneMappedImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+	}
+
+	swapchain_->Recreate(windowWidth_, windowHeight_);
+	forwardFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+	geometryFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+	lightingFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+	skyboxFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+	toneMapFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+	presentFrameBuffer_->Recreate(windowWidth_, windowHeight_);
+
+	forwardDescriptorSets_.clear();
+	geomDescriptorSets_.clear();
+	lightDescriptorSets_.clear();
+	for (auto& [name, model] : models_) {
+		forwardDescriptorSets_[name].resize(swapchain_->GetInflightCount());
+		geomDescriptorSets_[name].resize(swapchain_->GetInflightCount());
+		lightDescriptorSets_[name].resize(swapchain_->GetInflightCount());
+		for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
+			forwardDescriptorSets_[name][i] = device_.CreateDescriptorSet({
+				{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ model.material_->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+				}
+			);
+			geomDescriptorSets_[name][i] = device_.CreateDescriptorSet({
+				{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ model.material_->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				}
+				);
+
+			lightDescriptorSets_[name][i] = device_.CreateDescriptorSet({
+				{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ depthImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+				}
+			);
+		}
+	}
+
+	skyboxDescriptorSets_.clear();
+	toneMapDescriptorSets_.clear();
+	guiDescriptorSets_.clear();
+	skyboxDescriptorSets_.resize(swapchain_->GetInflightCount());
+	toneMapDescriptorSets_.resize(swapchain_->GetInflightCount());
+	guiDescriptorSets_.resize(swapchain_->GetInflightCount());
+	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
+		guiDescriptorSets_[i] = device_.CreateDescriptorSet({
+			{ toneMappedImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment},
+			}
+			);
+
+		skyboxDescriptorSets_[i] = device_.CreateDescriptorSet({
+		{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+		{ envMap_->GetEnvMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			}
+			);
+
+		toneMapDescriptorSets_[i] = device_.CreateDescriptorSet({
+			{ renderImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+			}
+			);
+	}
+
+	forwardPipeline_.reset();
+	geomPipeline_.reset();
+	lightPipeline_.reset();
+
+	forwardPipeline_ = device_.CreateGraphicsPipeline(
+		forwardRenderPass_, swapchain_, forwardVertShader_, forwardPixelShader_,
+		forwardDescriptorSets_.begin()->second[0],
+		vk::PushConstantRange()
+		.setOffset(0)
+		.setSize(sizeof(Factors))
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+	);
+	geomPipeline_ = device_.CreateGraphicsPipeline(
+		geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_,
+		geomDescriptorSets_.begin()->second[0],
+		vk::PushConstantRange()
+		.setOffset(0)
+		.setSize(sizeof(Factors))
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+	);
+	lightPipeline_ = device_.CreateGraphicsPipeline(
+		lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_,
+		lightDescriptorSets_.begin()->second[0]
+	);
+
+	skyboxPipeline_ = device_.CreateGraphicsPipeline(
+		skyboxRenderPass_, swapchain_, skyboxVertShader_, skyboxPixelShader_,
+		skyboxDescriptorSets_[0], {}, false
+	);
+
+	toneMapPipeline_ = device_.CreateGraphicsPipeline(
+		toneMapRenderPass_, swapchain_, toneMapVertShader_, toneMapPixelShader_,
+		toneMapDescriptorSets_[0]
+	);
+}
+
 App::App(std::string appName, unsigned int windowWidth, unsigned int windowHeight)
 	: Application(appName, windowWidth, windowHeight)
 {
@@ -11,6 +176,8 @@ App::App(std::string appName, unsigned int windowWidth, unsigned int windowHeigh
 
 void App::OnStart()
 {
+	NFD::Guard nfdGuard;
+
 	device_.Init(*this);
 
 	swapchain_ = device_.CreateSwapchain(windowWidth_, windowHeight_);
@@ -150,6 +317,40 @@ void App::OnStart()
 		);
 	}
 
+	std::map<string, AttachmentInfo> forwardAttachmentNameToInfo;
+	AttachmentInfo forwardRenderingResultAttachment;
+	forwardRenderingResultAttachment.attachmentDesc
+		.setFormat(vk::Format::eR16G16B16A16Sfloat)
+		.setSamples(vk::SampleCountFlagBits::e1)
+		.setLoadOp(vk::AttachmentLoadOp::eClear)
+		.setStoreOp(vk::AttachmentStoreOp::eStore)
+		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+		.setInitialLayout(vk::ImageLayout::eUndefined)
+		.setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+	forwardRenderingResultAttachment.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	forwardAttachmentNameToInfo["RenderingResult"] = forwardRenderingResultAttachment;
+
+	AttachmentInfo forwardDepthAttachment;
+	forwardDepthAttachment.attachmentDesc
+		.setFormat(vk::Format::eD32Sfloat)
+		.setSamples(vk::SampleCountFlagBits::e1)
+		.setLoadOp(vk::AttachmentLoadOp::eClear)
+		.setStoreOp(vk::AttachmentStoreOp::eStore)
+		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+		.setInitialLayout(vk::ImageLayout::eUndefined)
+		.setFinalLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+	forwardDepthAttachment.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+	forwardAttachmentNameToInfo["Depth"] = forwardDepthAttachment;
+
+	SubPassInfo forwardSubpass;
+	forwardSubpass.attachmentInfos = { "RenderingResult", "Depth"};
+
+	forwardRenderPass_ = device_.CreateRenderPass(
+		{ forwardSubpass }, forwardAttachmentNameToInfo
+	);
+
 	std::map<string, AttachmentInfo> geometryAttachmentNameToInfo;
 	AttachmentInfo gbuffer0; // BaseColor + Metalness
 	gbuffer0.attachmentDesc
@@ -288,6 +489,17 @@ void App::OnStart()
 
 	frameBuffer_ = device_.CreateFrameBuffer(renderPass_, swapchain_);
 
+	forwardFrameBuffer_ = device_.CreateFrameBuffer(
+		forwardRenderPass_,
+		{
+			{ renderImages_ },
+			{ depthImages_ }
+		},
+		sceneWidth_,
+		sceneHeight_,
+		swapchain_->GetInflightCount()
+	);
+
 	geometryFrameBuffer_ = device_.CreateFrameBuffer(
 		geometryRenderPass_,
 		{
@@ -338,8 +550,10 @@ void App::OnStart()
 		{}
 	);
 
-	mesh_ = device_.CreateMesh(string(MODEL_DIR) + "DamagedHelmet.gltf");
-	material_ = std::make_shared<Material>(device_, string(MODEL_DIR), "DamagedHelmet.gltf");
+	models_["DamagedHelmet"].mesh_ = device_.CreateMesh(string(MODEL_DIR) + "DamagedHelmet.gltf");
+	models_["DamagedHelmet"].material_ = std::make_shared<Material>(device_, string(MODEL_DIR), "DamagedHelmet.gltf");
+	/*mesh_ = device_.CreateMesh(string(MODEL_DIR) + "DamagedHelmet.gltf");
+	material_ = std::make_shared<Material>(device_, string(MODEL_DIR), "DamagedHelmet.gltf");*/
 
 	// Camera
 	camera_.Init((float)sceneWidth_ / (float)sceneHeight_, glm::vec3(0.0f, 0.0f, 5.0f)); // Note sign
@@ -349,13 +563,20 @@ void App::OnStart()
 	light0_.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// Sphere0
-	object_ = {};
+	//object_ = {};
 
 	cameraBuffer_ = device_.CreateBuffer(sizeof(CameraMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	cameraBuffer_->Write(CameraMatrix{ camera_.GetView(), camera_.GetProj() });
 
+	objects_.push_back(sqrp::Object(
+		models_["DamagedHelmet"].mesh_,
+		glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
+		glm::quat(glm::vec3(0.0f, 0.0f, 0.0f)),
+		1.0f
+	));
 	objectBuffer_ = device_.CreateBuffer(sizeof(TransformMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
-	objectBuffer_->Write(object_);
+	//objectBuffer_->Write(object_);
+	objectBuffer_->Write(objects_[0].GetTransform());
 
 	lightBuffer_ = device_.CreateBuffer(sizeof(Light), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	lightBuffer_->Write(light0_);
@@ -377,85 +598,77 @@ void App::OnStart()
 	vertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "Lambert.shader", sqrp::ShaderType::Vertex);
 	pixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "Lambert.shader", sqrp::ShaderType::Pixel);
 
+	forwardVertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "forward.shader", sqrp::ShaderType::Vertex);
+	forwardPixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "forward.shader", sqrp::ShaderType::Pixel);
 	geomVertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "geometrypass.shader", sqrp::ShaderType::Vertex);
 	geomPixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "geometrypass.shader", sqrp::ShaderType::Pixel);
 	lightVertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "lightingpass.shader", sqrp::ShaderType::Vertex);
 	lightPixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "lightingpass.shader", sqrp::ShaderType::Pixel);
 
-	gltfGeomVertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "gltfgeometrypass.shader", sqrp::ShaderType::Vertex);
-	gltfGeomPixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "gltfgeometrypass.shader", sqrp::ShaderType::Pixel);
-	gltfLightVertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "gltflightingpass.shader", sqrp::ShaderType::Vertex);
-	gltfLightPixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "gltflightingpass.shader", sqrp::ShaderType::Pixel);
-
 	skyboxVertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "skybox.shader", sqrp::ShaderType::Vertex);
 	skyboxPixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "skybox.shader", sqrp::ShaderType::Pixel);
-
-	decodeHDRCompShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "decodeHDR.shader", sqrp::ShaderType::Compute);
-	envMapCompShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "envmap.shader", sqrp::ShaderType::Compute);
-
 	toneMapVertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "tonemap.shader", sqrp::ShaderType::Vertex);
 	toneMapPixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "tonemap.shader", sqrp::ShaderType::Pixel);
 
+	envMapCompShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "envmap.shader", sqrp::ShaderType::Compute);
 	irradianceCompShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "irradiancemap.shader", sqrp::ShaderType::Compute);
 	prefilterCompShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "specularprefiltering.shader", sqrp::ShaderType::Compute);
 	brdfLUTCompShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "brdfLUT.shader", sqrp::ShaderType::Compute);
 
-	envMap_ = std::make_shared<EnvironmentMap>(device_, string(HDR_DIR), "warm_restaurant_4k.hdr", decodeHDRCompShader_, envMapCompShader_, irradianceCompShader_, prefilterCompShader_, brdfLUTCompShader_);
+	envMap_ = std::make_shared<EnvironmentMap>(device_, string(HDR_DIR), "warm_restaurant_4k.hdr", envMapCompShader_, irradianceCompShader_, prefilterCompShader_, brdfLUTCompShader_);
 
 	pipeline_ = device_.CreateGraphicsPipeline(renderPass_, swapchain_, vertShader_, pixelShader_, descriptorSet_);
 	
-	geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
-	lightingDescriptorSets_.resize(swapchain_->GetInflightCount());
-	gltfGeomDescriptorSets_.resize(swapchain_->GetInflightCount());
-	gltfLightDescriptorSets_.resize(swapchain_->GetInflightCount());
+	for (auto& [name, model] : models_) {
+		forwardDescriptorSets_[name].resize(swapchain_->GetInflightCount());
+		geomDescriptorSets_[name].resize(swapchain_->GetInflightCount());
+		lightDescriptorSets_[name].resize(swapchain_->GetInflightCount());
+		for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
+			forwardDescriptorSets_[name][i] = device_.CreateDescriptorSet({
+				{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ model.material_->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+				}
+			);
+			geomDescriptorSets_[name][i] = device_.CreateDescriptorSet({
+				{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ model.material_->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				}
+			);
+
+			lightDescriptorSets_[name][i] = device_.CreateDescriptorSet({
+				{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ depthImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+				}
+			);
+		}
+	}
+
 	guiDescriptorSets_.resize(swapchain_->GetInflightCount());
 	skyboxDescriptorSets_.resize(swapchain_->GetInflightCount());
 	toneMapDescriptorSets_.resize(swapchain_->GetInflightCount());
 	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
-		geometryDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ colorBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }
-			}
-		);
-
-		lightingDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ colorBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
-			}
-		);
-
-		gltfGeomDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ material_->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ material_->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ material_->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ material_->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ material_->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			}
-		);
-
-		gltfLightDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ depthImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ envMap_->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ envMap_->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ envMap_->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
-			}
-		);
-
 		guiDescriptorSets_[i] = device_.CreateDescriptorSet({
 			{ toneMappedImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment},
 			}
@@ -473,20 +686,26 @@ void App::OnStart()
 		);
 	}
 
-	geometryPipeline_ = device_.CreateGraphicsPipeline(geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_, geometryDescriptorSets_[0]);
-	lightingPipeline_ = device_.CreateGraphicsPipeline(lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_, lightingDescriptorSets_[0]);
 
-	gltfGeomPipeline_ = device_.CreateGraphicsPipeline(
-		geometryRenderPass_, swapchain_, gltfGeomVertShader_, gltfGeomPixelShader_, 
-		gltfGeomDescriptorSets_[0],
+	forwardPipeline_ = device_.CreateGraphicsPipeline(
+		forwardRenderPass_, swapchain_, forwardVertShader_, forwardPixelShader_, 
+		forwardDescriptorSets_.begin()->second[0],
 		vk::PushConstantRange()
 		.setOffset(0)
 		.setSize(sizeof(Factors))
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 	);
-	gltfLightPipeline_ = device_.CreateGraphicsPipeline(
-		lightingRenderPass_, swapchain_, gltfLightVertShader_, gltfLightPixelShader_, 
-		gltfLightDescriptorSets_[0]
+	geomPipeline_ = device_.CreateGraphicsPipeline(
+		geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_, 
+		geomDescriptorSets_.begin()->second[0],
+		vk::PushConstantRange()
+		.setOffset(0)
+		.setSize(sizeof(Factors))
+		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+	);
+	lightPipeline_ = device_.CreateGraphicsPipeline(
+		lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_, 
+		lightDescriptorSets_.begin()->second[0]
 	);
 
 	skyboxPipeline_ = device_.CreateGraphicsPipeline(
@@ -557,169 +776,13 @@ void App::OnUpdate()
 
 	if (isChangedSceneSize) {
 
-		device_.WaitIdle(QueueContextType::General);
-
-		vk::SamplerCreateInfo colorSamplerInfo;
-		colorSamplerInfo
-			.setMagFilter(vk::Filter::eLinear)
-			.setMinFilter(vk::Filter::eLinear)
-			.setMipmapMode(vk::SamplerMipmapMode::eNearest)
-			.setAddressModeU(vk::SamplerAddressMode::eClampToEdge)
-			.setAddressModeV(vk::SamplerAddressMode::eClampToEdge)
-			.setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
-			.setMipLodBias(0.0f)
-			.setAnisotropyEnable(VK_FALSE)
-			.setMaxAnisotropy(1.0f)
-			.setCompareEnable(VK_FALSE)
-			.setCompareOp(vk::CompareOp::eAlways)
-			.setMinLod(0.0f)
-			.setMaxLod(0.0f)
-			.setBorderColor(vk::BorderColor::eIntOpaqueWhite)
-			.setUnnormalizedCoordinates(VK_FALSE);
-		vk::SamplerCreateInfo depthSamplerInfo;
-		depthSamplerInfo
-			.setMagFilter(vk::Filter::eNearest)
-			.setMinFilter(vk::Filter::eNearest)
-			.setMipmapMode(vk::SamplerMipmapMode::eNearest)
-			.setAddressModeU(vk::SamplerAddressMode::eClampToEdge)
-			.setAddressModeV(vk::SamplerAddressMode::eClampToEdge)
-			.setAddressModeW(vk::SamplerAddressMode::eClampToEdge)
-			.setMipLodBias(0.0f)
-			.setAnisotropyEnable(VK_FALSE)
-			.setMaxAnisotropy(1.0f)
-			.setCompareEnable(VK_FALSE)
-			.setCompareOp(vk::CompareOp::eAlways)
-			.setMinLod(0.0f)
-			.setMaxLod(0.0f)
-			.setBorderColor(vk::BorderColor::eIntOpaqueWhite)
-			.setUnnormalizedCoordinates(VK_FALSE);
-
-		for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
-			baseColorMetallnessImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-			normalRoughnessImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-			emissiveAOImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-			depthImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-			renderImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-			toneMappedImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-		}
-
-		swapchain_->Recreate(windowWidth_, windowHeight_);
-		geometryFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
-		lightingFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
-		skyboxFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
-		toneMapFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
-		presentFrameBuffer_->Recreate(windowWidth_, windowHeight_);
-
-		geometryDescriptorSets_.clear();
-		lightingDescriptorSets_.clear();
-		gltfGeomDescriptorSets_.clear();
-		gltfLightDescriptorSets_.clear();
-		skyboxDescriptorSets_.clear();
-		toneMapDescriptorSets_.clear();
-		guiDescriptorSets_.clear();
-		geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
-		lightingDescriptorSets_.resize(swapchain_->GetInflightCount());
-		gltfGeomDescriptorSets_.resize(swapchain_->GetInflightCount());
-		gltfLightDescriptorSets_.resize(swapchain_->GetInflightCount());
-		skyboxDescriptorSets_.resize(swapchain_->GetInflightCount());
-		toneMapDescriptorSets_.resize(swapchain_->GetInflightCount());
-		guiDescriptorSets_.resize(swapchain_->GetInflightCount());
-		for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
-			geometryDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ colorBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }
-				}
-			);
-
-			lightingDescriptorSets_[i] = device_.CreateDescriptorSet({
-				{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ colorBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				}
-				);
-
-			gltfGeomDescriptorSets_[i] = device_.CreateDescriptorSet({
-				{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ material_->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ material_->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ material_->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ material_->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ material_->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				}
-				);
-
-			gltfLightDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ depthImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ envMap_->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ envMap_->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ envMap_->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
-				}
-			);
-
-			guiDescriptorSets_[i] = device_.CreateDescriptorSet({
-				{ toneMappedImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment},
-				}
-				);
-
-			skyboxDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ envMap_->GetEnvMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				}
-				);
-
-			toneMapDescriptorSets_[i] = device_.CreateDescriptorSet({
-				{ renderImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				}
-				);
-		}
-
-		geometryPipeline_.reset();
-		lightingPipeline_.reset();
-		gltfGeomPipeline_.reset();
-		gltfLightPipeline_.reset();
-
-		geometryPipeline_ = device_.CreateGraphicsPipeline(geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_, geometryDescriptorSets_[0]);
-		lightingPipeline_ = device_.CreateGraphicsPipeline(lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_, lightingDescriptorSets_[0]);
-		gltfGeomPipeline_ = device_.CreateGraphicsPipeline(
-			geometryRenderPass_, swapchain_, gltfGeomVertShader_, gltfGeomPixelShader_,
-			gltfGeomDescriptorSets_[0],
-			vk::PushConstantRange()
-			.setOffset(0)
-			.setSize(sizeof(Factors))
-			.setStageFlags(vk::ShaderStageFlagBits::eFragment)
-		);
-		gltfLightPipeline_ = device_.CreateGraphicsPipeline(
-			lightingRenderPass_, swapchain_, gltfLightVertShader_, gltfLightPixelShader_,
-			gltfLightDescriptorSets_[0]
-		);
-
-		skyboxPipeline_ = device_.CreateGraphicsPipeline(
-			skyboxRenderPass_, swapchain_, skyboxVertShader_, skyboxPixelShader_,
-			skyboxDescriptorSets_[0], {}, false
-		);
-
-		toneMapPipeline_ = device_.CreateGraphicsPipeline(
-			toneMapRenderPass_, swapchain_, toneMapVertShader_, toneMapPixelShader_,
-			toneMapDescriptorSets_[0]
-		);
+		Recreate();
 	}
 
 	camera_.Update(sceneWidth_, sceneHeight_);
 	cameraBuffer_->Write(CameraMatrix{ camera_.GetView(), camera_.GetProj() });
 	detailCameraBuffer_->Write(DetailCamera{ camera_.GetView(), camera_.GetProj(), camera_.GetInvView(), camera_.GetInvProj(), camera_.GetPos(), camera_.GetNearClip(), camera_.GetFarClip() });
+	objectBuffer_->Write(objects_[0].GetTransform());
 
 	swapchain_->WaitFrame();
 
@@ -738,60 +801,73 @@ void App::OnUpdate()
 		vk::AccessFlagBits::eDepthStencilAttachmentWrite
 	);
 
-	commandBuffer->BeginRenderPass(geometryRenderPass_, geometryFrameBuffer_, infligtIndex);
-	commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
-	commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
-	commandBuffer->BindPipeline(gltfGeomPipeline_, vk::PipelineBindPoint::eGraphics);
-	commandBuffer->BindDescriptorSet(gltfGeomPipeline_, gltfGeomDescriptorSets_[infligtIndex], vk::PipelineBindPoint::eGraphics);
-	commandBuffer->PushConstants(gltfGeomPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), material_->GetPFactors());
-	commandBuffer->BindMeshBuffer(mesh_);
-	commandBuffer->DrawMesh(mesh_);
-	commandBuffer->EndRenderPass();
+	if (renderMode_ == 1) {
+		commandBuffer->BeginRenderPass(geometryRenderPass_, geometryFrameBuffer_, infligtIndex);
+		commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
+		commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
+		commandBuffer->BindPipeline(geomPipeline_, vk::PipelineBindPoint::eGraphics);
+		commandBuffer->BindDescriptorSet(geomPipeline_, geomDescriptorSets_["DamagedHelmet"][infligtIndex], vk::PipelineBindPoint::eGraphics);
+		commandBuffer->PushConstants(geomPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), models_["DamagedHelmet"].material_->GetPFactors());
+		commandBuffer->BindMeshBuffer(models_["DamagedHelmet"].mesh_);
+		commandBuffer->DrawMesh(models_["DamagedHelmet"].mesh_);
+		commandBuffer->EndRenderPass();
 
-	commandBuffer->ImageBarrier(
-		baseColorMetallnessImages_[infligtIndex],
-		vk::ImageLayout::eShaderReadOnlyOptimal,
-		vk::ImageLayout::eShaderReadOnlyOptimal,
-		vk::PipelineStageFlagBits::eColorAttachmentOutput,
-		vk::PipelineStageFlagBits::eFragmentShader,
-		vk::AccessFlagBits::eColorAttachmentWrite,
-		vk::AccessFlagBits::eShaderRead
-	);
-	commandBuffer->ImageBarrier(
-		normalRoughnessImages_[infligtIndex],
-		vk::ImageLayout::eShaderReadOnlyOptimal,
-		vk::ImageLayout::eShaderReadOnlyOptimal,
-		vk::PipelineStageFlagBits::eColorAttachmentOutput,
-		vk::PipelineStageFlagBits::eFragmentShader,
-		vk::AccessFlagBits::eColorAttachmentWrite,
-		vk::AccessFlagBits::eShaderRead
-	);
-	commandBuffer->ImageBarrier(
-		emissiveAOImages_[infligtIndex],
-		vk::ImageLayout::eShaderReadOnlyOptimal,
-		vk::ImageLayout::eShaderReadOnlyOptimal,
-		vk::PipelineStageFlagBits::eColorAttachmentOutput,
-		vk::PipelineStageFlagBits::eFragmentShader,
-		vk::AccessFlagBits::eColorAttachmentWrite,
-		vk::AccessFlagBits::eShaderRead
-	);
-	commandBuffer->ImageBarrier(
-		depthImages_[infligtIndex],
-		vk::ImageLayout::eShaderReadOnlyOptimal,
-		vk::ImageLayout::eShaderReadOnlyOptimal,
-		vk::PipelineStageFlagBits::eLateFragmentTests,
-		vk::PipelineStageFlagBits::eFragmentShader,
-		vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-		vk::AccessFlagBits::eShaderRead
-	);
+		commandBuffer->ImageBarrier(
+			baseColorMetallnessImages_[infligtIndex],
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			vk::PipelineStageFlagBits::eColorAttachmentOutput,
+			vk::PipelineStageFlagBits::eFragmentShader,
+			vk::AccessFlagBits::eColorAttachmentWrite,
+			vk::AccessFlagBits::eShaderRead
+		);
+		commandBuffer->ImageBarrier(
+			normalRoughnessImages_[infligtIndex],
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			vk::PipelineStageFlagBits::eColorAttachmentOutput,
+			vk::PipelineStageFlagBits::eFragmentShader,
+			vk::AccessFlagBits::eColorAttachmentWrite,
+			vk::AccessFlagBits::eShaderRead
+		);
+		commandBuffer->ImageBarrier(
+			emissiveAOImages_[infligtIndex],
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			vk::PipelineStageFlagBits::eColorAttachmentOutput,
+			vk::PipelineStageFlagBits::eFragmentShader,
+			vk::AccessFlagBits::eColorAttachmentWrite,
+			vk::AccessFlagBits::eShaderRead
+		);
+		commandBuffer->ImageBarrier(
+			depthImages_[infligtIndex],
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			vk::PipelineStageFlagBits::eLateFragmentTests,
+			vk::PipelineStageFlagBits::eFragmentShader,
+			vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+			vk::AccessFlagBits::eShaderRead
+		);
 
-	commandBuffer->BeginRenderPass(lightingRenderPass_, lightingFrameBuffer_, infligtIndex);
-	commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
-	commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
-	commandBuffer->BindPipeline(gltfLightPipeline_, vk::PipelineBindPoint::eGraphics);
-	commandBuffer->BindDescriptorSet(gltfLightPipeline_, gltfLightDescriptorSets_[infligtIndex], vk::PipelineBindPoint::eGraphics);
-	commandBuffer->Draw(3, 1); // Fullscreen Triangle
-	commandBuffer->EndRenderPass();
+		commandBuffer->BeginRenderPass(lightingRenderPass_, lightingFrameBuffer_, infligtIndex);
+		commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
+		commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
+		commandBuffer->BindPipeline(lightPipeline_, vk::PipelineBindPoint::eGraphics);
+		commandBuffer->BindDescriptorSet(lightPipeline_, lightDescriptorSets_["DamagedHelmet"][infligtIndex], vk::PipelineBindPoint::eGraphics);
+		commandBuffer->Draw(3, 1); // Fullscreen Triangle
+		commandBuffer->EndRenderPass();
+	}
+	else if (renderMode_ == 0) {
+		commandBuffer->BeginRenderPass(forwardRenderPass_, forwardFrameBuffer_, infligtIndex);
+		commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
+		commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
+		commandBuffer->BindPipeline(forwardPipeline_, vk::PipelineBindPoint::eGraphics);
+		commandBuffer->BindDescriptorSet(forwardPipeline_, forwardDescriptorSets_["DamagedHelmet"][infligtIndex], vk::PipelineBindPoint::eGraphics);
+		commandBuffer->PushConstants(forwardPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), models_["DamagedHelmet"].material_->GetPFactors());
+		commandBuffer->BindMeshBuffer(models_["DamagedHelmet"].mesh_);
+		commandBuffer->DrawMesh(models_["DamagedHelmet"].mesh_);
+		commandBuffer->EndRenderPass();
+	}
 
 	commandBuffer->BeginRenderPass(skyboxRenderPass_, skyboxFrameBuffer_, infligtIndex);
 	commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
@@ -881,17 +957,28 @@ void App::OnUpdate()
 	ImVec2 contentSize = ImGui::GetContentRegionAvail();
 	ImTextureID texId = (ImTextureID)((VkDescriptorSet)guiDescriptorSets_[infligtIndex]->GetDescriptorSet());
 	ImGui::Image(texId, contentSize); // シーンテクスチャ表示
+	
 	ImVec2 windowPos = ImGui::GetWindowPos();
 	ImVec2 windowSize = ImGui::GetWindowSize();
 	float sceneTitleBarHeight = ImGui::GetFrameHeight();
+	ImGui::SetCursorPos(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight())); // Image 内の座標
+	if (ImGui::Button("Translate")) gizmoOperation_ = ImGuizmo::TRANSLATE;
+	ImGui::SameLine();
+	if (ImGui::Button("Rotate"))    gizmoOperation_ = ImGuizmo::ROTATE;
+	ImGui::SameLine();
+	if (ImGui::Button("Scale"))     gizmoOperation_ = ImGuizmo::SCALE;
+	if (ImGui::Selectable("Forward", renderMode_ == 0)) renderMode_ = 0;
+	if (ImGui::Selectable("Differed", renderMode_ == 1))    renderMode_ = 1;
+
 	glm::mat4 view = camera_.GetView();
 	glm::mat4 proj = camera_.GetProj();
 	glm::mat4 indentityMatrix = glm::mat4(1.0f);
 	ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
 	ImGuizmo::SetRect(windowPos.x, windowPos.y, windowSize.x, windowSize.y);
-	ImGuizmo::DrawGrid(glm::value_ptr(view), glm::value_ptr(proj), glm::value_ptr(indentityMatrix), 100.f);
+	//ImGuizmo::DrawGrid(glm::value_ptr(view), glm::value_ptr(proj), glm::value_ptr(indentityMatrix), 100.f);
 	ImGui::End();
 	ImGuizmo::ViewManipulate(glm::value_ptr(view), 1.0f, ImVec2(sceneWidth_ / 6.0f * 5, sceneTitleBarHeight), ImVec2(sceneWidth_ / 6.0f, sceneHeight_ / 6.0f), 0x10101010);
+
 	glm::quat qCamera = glm::quat_cast(glm::transpose(glm::mat3(view)));
 	// Using ImGui::GetWindowWidth() returns default value, (400, 400), when no resize
 	//ImVec2 gizmoPos = ImVec2(ImGui::GetWindowPos().x + sceneWidth_ - sceneWidth_ / 6.0f, ImGui::GetWindowPos().y);
@@ -903,11 +990,38 @@ void App::OnUpdate()
 	if (isMouseOverViewCube) {
 		Input::SetCatchInput(false);
 	}
+	glm::mat4 model = objects_[0].GetModel();
+	if (isShowGuizmo_) {
+		ImGuizmo::Manipulate(
+			glm::value_ptr(view), glm::value_ptr(proj), gizmoOperation_,
+			ImGuizmo::MODE::LOCAL, glm::value_ptr(model)
+		);
+		if (ImGuizmo::IsUsing()) {
+			Input::SetCatchInput(false);
+		}
+	}
+	objects_[0].UpdateTransform(model);
+
 	ImGui::PopStyleVar();
 
 	// 2. ツールパネル描画（横に並べる）
-	float position[] = {0.2f, 0.2f, 0.2f};
-	float rotation[] = {0.2f, 0.2f, 0.2f};
+	glm::vec3 position = objects_[0].GetPosition();
+	glm::vec3 displayRotation = glm::degrees(objects_[0].GetRotation());
+	if (fabs(displayRotation.x) < 0.01f) displayRotation.x = 0.0f;
+	if (fabs(displayRotation.y) < 0.01f) displayRotation.y = 0.0f;
+	if (fabs(displayRotation.z) < 0.01f) displayRotation.z = 0.0f;
+	glm::vec3 scale = objects_[0].GetScale();
+	auto NormalizeAngle = [](float angle) {
+		while (angle > 180.0f) angle -= 360.0f;
+		while (angle < -180.0f) angle += 360.0f;
+		// ±180 の境界を丸める
+		if (fabs(angle - 180.0f) < 0.01f || fabs(angle + 180.0f) < 0.01f)
+			angle = 180.0f;
+		return angle;
+	};
+	displayRotation.x = NormalizeAngle(displayRotation.x);
+	displayRotation.y = NormalizeAngle(displayRotation.y);
+	displayRotation.z = NormalizeAngle(displayRotation.z);
 	ImGuiWindowFlags panelWindowFlag = ImGuiWindowFlags_NoCollapse;
 	if ((catchPanelDir_ & GuiDir::Right) || (catchPanelDir_ & GuiDir::Up) || (catchPanelDir_ & GuiDir::Down))
 	{
@@ -945,8 +1059,28 @@ void App::OnUpdate()
 	changedPanelWidth_ = size.x;
 	changedPanelHeight_ = size.y;
 	ImGui::Text("Transform");
-	ImGui::SliderFloat3("Position", position, -10.0f, 10.0f);
-	ImGui::SliderFloat3("Rotation", rotation, -180.0f, 180.0f);
+	ImGui::Checkbox("Show Guizmo", &isShowGuizmo_);
+	if (ImGui::InputFloat3("Position", glm::value_ptr(position))) {
+		objects_[0].SetPosition(position);
+	}
+	ImGui::InputFloat3("Rotation", glm::value_ptr(displayRotation));
+	if (!ImGui::IsItemActive() && isModifiedRotation_)
+	{
+		glm::vec3 normalizedRotation;
+		normalizedRotation.x = NormalizeAngle(displayRotation.x);
+		normalizedRotation.y = NormalizeAngle(displayRotation.y);
+		normalizedRotation.z = NormalizeAngle(displayRotation.z);
+		objects_[0].SetRotation(glm::quat(glm::radians(normalizedRotation)));
+		isModifiedRotation_ = false;
+	}
+	if (ImGui::IsItemActive())
+	{
+		isModifiedRotation_ = true;
+	}
+	if (ImGui::InputFloat3("Scale", glm::value_ptr(scale)))
+	{
+		objects_[0].SetScale(scale);
+	}
 	ImGui::End();
 
 	// 3. ファイルツールパネル描画（縦に並べる）
@@ -989,8 +1123,28 @@ void App::OnUpdate()
 	changedFilePanelWidth_ = size.x;
 	changedFilePanelHeight_ = size.y;
 	ImGui::Text("Test Transform");
-	ImGui::SliderFloat3("Position", position, -10.0f, 10.0f);
-	ImGui::SliderFloat3("Rotation", rotation, -180.0f, 180.0f);
+	std::string selectedFile = "";
+	if (ImGui::Button("Open glTF File")) {
+		// auto-freeing memory
+		NFD::UniquePath outPath;
+
+		// prepare filters for the dialog
+		nfdfilteritem_t filterItem[1] = { {"GLTF file", "gltf"} };
+
+		// show the dialog
+		nfdresult_t result = NFD::OpenDialog(outPath, filterItem, 1);
+		if (result == NFD_OKAY) {
+			std::cout << "Success!" << std::endl << outPath.get() << std::endl;
+		}
+		else if (result == NFD_CANCEL) {
+			std::cout << "User pressed cancel." << std::endl;
+		}
+		else {
+			std::cout << "Error: " << NFD::GetError() << std::endl;
+		}
+	}
+	//ImGui::SliderFloat3("Position", position, -10.0f, 10.0f);
+	//ImGui::SliderFloat3("Rotation", rotation, -180.0f, 180.0f);
 	ImGui::End();
 
 	commandBuffer->DrawGui(*gui_);
@@ -1025,7 +1179,9 @@ void App::OnResize(unsigned int width, unsigned int height)
 	changedFilePanelWidth_ = filePanelWidth_;
 	changedFilePanelHeight_ = filePanelHeight_;
 
-	device_.WaitIdle(QueueContextType::General);
+	Recreate();
+
+	/*device_.WaitIdle(QueueContextType::General);
 
 	vk::SamplerCreateInfo colorSamplerInfo;
 	colorSamplerInfo
@@ -1078,73 +1234,54 @@ void App::OnResize(unsigned int width, unsigned int height)
 	toneMapFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
 	presentFrameBuffer_->Recreate(width, height);
 
-	geometryDescriptorSets_.clear();
-	lightingDescriptorSets_.clear();
-	gltfGeomDescriptorSets_.clear();
-	gltfLightDescriptorSets_.clear();
+	geomDescriptorSets_.clear();
+	lightDescriptorSets_.clear();
+	for (auto& [name, model] : models_) {
+		geomDescriptorSets_[name].resize(swapchain_->GetInflightCount());
+		lightDescriptorSets_[name].resize(swapchain_->GetInflightCount());
+		for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
+			geomDescriptorSets_[name][i] = device_.CreateDescriptorSet({
+				{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ model.material_->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ model.material_->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				}
+				);
+
+			lightDescriptorSets_[name][i] = device_.CreateDescriptorSet({
+				{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+				{ depthImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+				{ envMap_->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+				}
+			);
+		}
+	}
+
 	skyboxDescriptorSets_.clear();
 	toneMapDescriptorSets_.clear();
 	guiDescriptorSets_.clear();
-	geometryDescriptorSets_.resize(swapchain_->GetInflightCount());
-	lightingDescriptorSets_.resize(swapchain_->GetInflightCount());
-	gltfGeomDescriptorSets_.resize(swapchain_->GetInflightCount());
-	gltfLightDescriptorSets_.resize(swapchain_->GetInflightCount());
 	skyboxDescriptorSets_.resize(swapchain_->GetInflightCount());
 	toneMapDescriptorSets_.resize(swapchain_->GetInflightCount());
 	guiDescriptorSets_.resize(swapchain_->GetInflightCount());
 	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
-		geometryDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ colorBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }
-			}
-		);
-
-		lightingDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ colorBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			}
-			);
-
-		gltfGeomDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ objectBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ material_->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ material_->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ material_->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ material_->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ material_->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			}
-			);
-
-		gltfLightDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ depthImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ envMap_->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ envMap_->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-			{ envMap_->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
-			}
-		);
-
 		guiDescriptorSets_[i] = device_.CreateDescriptorSet({
 			{ toneMappedImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment},
 			}
 			);
 
 		skyboxDescriptorSets_[i] = device_.CreateDescriptorSet({
-			{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-			{ envMap_->GetEnvMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+		{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+		{ envMap_->GetEnvMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 			}
 			);
 
@@ -1154,25 +1291,20 @@ void App::OnResize(unsigned int width, unsigned int height)
 			);
 	}
 
-	geometryPipeline_.reset();
-	lightingPipeline_.reset();
-	gltfGeomPipeline_.reset();
-	gltfLightPipeline_.reset();
+	geomPipeline_.reset();
+	lightPipeline_.reset();
 
-	geometryPipeline_ = device_.CreateGraphicsPipeline(geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_, geometryDescriptorSets_[0]);
-	lightingPipeline_ = device_.CreateGraphicsPipeline(lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_, lightingDescriptorSets_[0]);
-
-	gltfGeomPipeline_ = device_.CreateGraphicsPipeline(
-		geometryRenderPass_, swapchain_, gltfGeomVertShader_, gltfGeomPixelShader_,
-		gltfGeomDescriptorSets_[0],
+	geomPipeline_ = device_.CreateGraphicsPipeline(
+		geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_,
+		geomDescriptorSets_.begin()->second[0],
 		vk::PushConstantRange()
 		.setOffset(0)
 		.setSize(sizeof(Factors))
 		.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 	);
-	gltfLightPipeline_ = device_.CreateGraphicsPipeline(
-		lightingRenderPass_, swapchain_, gltfLightVertShader_, gltfLightPixelShader_,
-		gltfLightDescriptorSets_[0]
+	lightPipeline_ = device_.CreateGraphicsPipeline(
+		lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_,
+		lightDescriptorSets_.begin()->second[0]
 	);
 
 	skyboxPipeline_ = device_.CreateGraphicsPipeline(
@@ -1183,7 +1315,7 @@ void App::OnResize(unsigned int width, unsigned int height)
 	toneMapPipeline_ = device_.CreateGraphicsPipeline(
 		toneMapRenderPass_, swapchain_, toneMapVertShader_, toneMapPixelShader_,
 		toneMapDescriptorSets_[0]
-	);
+	);*/
 }
 
 void App::OnTerminate()

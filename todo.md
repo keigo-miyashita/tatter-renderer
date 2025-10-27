@@ -1,0 +1,3 @@
+- Componentでmodeldata, transformをアタッチできるようにする
+- Android対応
+- Forward passの実装

@@ -19,10 +19,25 @@ layout(std140, set = 0, binding = 2) uniform Light
 	vec4 lightColor;
 } light;
 
-layout(std140, set = 0, binding = 3) uniform Color
+layout(set = 0, binding = 3) uniform sampler2D baseColorTexture;
+
+layout(set = 0, binding = 4) uniform sampler2D metallicRoughnessTexture;
+
+layout(set = 0, binding = 5) uniform sampler2D normalTexture;
+
+layout(set = 0, binding = 6) uniform sampler2D occlusionTexture;
+
+layout(set = 0, binding = 7) uniform sampler2D emissiveTexture;
+
+layout(push_constant) uniform Factors
 {
 	vec4 baseColor;
-} color;
+	vec3 emissive;
+	float padding;
+	float metallic;
+	float roughness;
+} factors;
+
 
 
 #ifdef GL_VERTEX_SHADER
@@ -39,8 +54,15 @@ layout(location = 3) out vec2 fUV;
 void main()
 {
 	fWorldPosition = object.model * vPosition;
-	fNormal = normalize(object.ITModel * vNormal);
-	fTangent = normalize(object.ITModel * vTangent);
+	vec3 normal = normalize(object.ITModel * vNormal).rgb;
+	vec3 tangent = normalize(object.model * vTangent).rgb;
+	tangent = normalize(tangent - dot(tangent, normal) * normal);
+	vec3 bitangent = normalize(cross(normal, tangent)) * vTangent.w;
+	mat3 TBN = mat3(tangent, bitangent, normal);
+
+	vec3 normalMap = texture(normalTexture, vUV).xyz * 2.0 - 1.0;
+	fNormal = vec4(normalize(TBN * normalMap), 0.0);  
+
 	fUV = vUV;
 
 	gl_Position = camera.proj * camera.view * fWorldPosition;
@@ -59,23 +81,17 @@ layout(location = 2) out vec4 outEmissiveAO;    // gbuffer2
 
 void main()
 {
-	// アルベドはテクスチャ参照
-	vec3 N = normalize(fNormal.xyz);
-	vec3 L = normalize(light.lightPos.xyz);
+	vec3 outputColor = texture(baseColorTexture, fUV).rgb * factors.baseColor.rgb;
+	float metallic = texture(metallicRoughnessTexture, fUV).g * factors.metallic;
+    outBaseColorMetallness = vec4(outputColor.rgb, metallic);
 
-	float diff = max(dot(N, L), 0.0);
-
-	vec3 outputColor = color.baseColor.rgb * light.lightColor.rgb * diff;
-
-    // outBaseColorMetallness = vec4(outputColor, 1.0f);
-    outBaseColorMetallness = vec4(color.baseColor.rgb, 1.0f);
-
-    // 法線を[0,1]に変換して格納
-    outNormalRoughness = vec4(normalize(fNormal.rgb) * 0.5 + 0.5, 1.0);
-    // outNormalRoughness = vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	vec3 normal = fNormal.rgb;
+	float roughness = texture(metallicRoughnessTexture, fUV).b * factors.roughness;
+    outNormalRoughness = vec4((normal.rgb + 1.0f) * 0.5f, roughness);
 
     // 追加情報（例: roughness, metallic）
-    outEmissiveAO = vec4(0.0, 0.0, 0.0, 1.0);
-    // outEmissiveAO = vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	vec3 emissive = texture(emissiveTexture, fUV).rgb * factors.emissive;
+	float ao = texture(occlusionTexture, fUV).r;
+    outEmissiveAO = vec4(emissive.rgb, ao);
 }
 #endif

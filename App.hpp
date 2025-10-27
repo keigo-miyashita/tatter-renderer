@@ -3,6 +3,8 @@
 #include <pch.hpp>
 #include <sqrap.hpp>
 
+#include <nfd.hpp>
+
 #include "Material.hpp"
 #include "EnvironmentMap.hpp"
 
@@ -32,6 +34,17 @@ struct Light
 	glm::vec4 color;
 };
 
+struct ModelData
+{
+	sqrp::MeshHandle mesh_ = nullptr;
+	MaterialHandle material_ = nullptr;
+};
+
+//struct ObjectData
+//{
+//	sqrp::
+//};
+
 class App : public sqrp::Application
 {
 private:
@@ -50,24 +63,27 @@ private:
 	std::vector<sqrp::ImageHandle> toneMappedImages_;
 
 	sqrp::RenderPassHandle renderPass_;
+	sqrp::RenderPassHandle forwardRenderPass_;
 	sqrp::RenderPassHandle geometryRenderPass_;
 	sqrp::RenderPassHandle lightingRenderPass_;
 	sqrp::RenderPassHandle skyboxRenderPass_;
 	sqrp::RenderPassHandle toneMapRenderPass_;
 	sqrp::RenderPassHandle presentRenderPass_;
 	sqrp::FrameBufferHandle	frameBuffer_;
+	sqrp::FrameBufferHandle	forwardFrameBuffer_;
 	sqrp::FrameBufferHandle	geometryFrameBuffer_;
 	sqrp::FrameBufferHandle	lightingFrameBuffer_;
 	sqrp::FrameBufferHandle skyboxFrameBuffer_;
 	sqrp::FrameBufferHandle toneMapFrameBuffer_;
 	sqrp::FrameBufferHandle presentFrameBuffer_;
-	sqrp::MeshHandle mesh_;
-	MaterialHandle material_;
+	/*sqrp::MeshHandle mesh_;
+	MaterialHandle material_;*/
+	std::unordered_map<std::string, ModelData> models_;
 	EnvMapHandle envMap_;
 
 	sqrp::Camera camera_;
 	Light light0_;
-	sqrp::TransformMatrix object_;
+	std::vector<sqrp::Object> objects_ = {};
 
 	sqrp::BufferHandle cameraBuffer_;
 	sqrp::BufferHandle objectBuffer_;
@@ -77,38 +93,30 @@ private:
 
 	sqrp::ShaderHandle vertShader_;
 	sqrp::ShaderHandle pixelShader_;
+	sqrp::ShaderHandle forwardVertShader_;
+	sqrp::ShaderHandle forwardPixelShader_;
 	sqrp::ShaderHandle geomVertShader_;
 	sqrp::ShaderHandle geomPixelShader_;
 	sqrp::ShaderHandle lightVertShader_;
 	sqrp::ShaderHandle lightPixelShader_;
-	sqrp::ShaderHandle gltfGeomVertShader_;
-	sqrp::ShaderHandle gltfGeomPixelShader_;
-	sqrp::ShaderHandle gltfLightVertShader_;
-	sqrp::ShaderHandle gltfLightPixelShader_;
-	sqrp::ShaderHandle decodeHDRCompShader_;
 	sqrp::ShaderHandle envMapCompShader_;
+	sqrp::ShaderHandle irradianceCompShader_;
+	sqrp::ShaderHandle prefilterCompShader_;
+	sqrp::ShaderHandle brdfLUTCompShader_;
 	sqrp::ShaderHandle skyboxVertShader_;
 	sqrp::ShaderHandle skyboxPixelShader_;
 	sqrp::ShaderHandle toneMapVertShader_;
 	sqrp::ShaderHandle toneMapPixelShader_;
-	sqrp::ShaderHandle irradianceCompShader_;
-	sqrp::ShaderHandle prefilterCompShader_;
-	sqrp::ShaderHandle brdfLUTCompShader_;
 
 	sqrp::DescriptorSetHandle descriptorSet_;
 	sqrp::GraphicsPipelineHandle pipeline_;
 
-	std::vector<sqrp::DescriptorSetHandle> guiDescriptorSets_;
-
-	std::vector<sqrp::DescriptorSetHandle> geometryDescriptorSets_;
-	sqrp::GraphicsPipelineHandle geometryPipeline_;
-	std::vector<sqrp::DescriptorSetHandle> lightingDescriptorSets_;
-	sqrp::GraphicsPipelineHandle lightingPipeline_;
-
-	std::vector<sqrp::DescriptorSetHandle> gltfGeomDescriptorSets_;
-	sqrp::GraphicsPipelineHandle gltfGeomPipeline_;
-	std::vector<sqrp::DescriptorSetHandle> gltfLightDescriptorSets_;
-	sqrp::GraphicsPipelineHandle gltfLightPipeline_;
+	std::unordered_map<std::string, std::vector<sqrp::DescriptorSetHandle>> forwardDescriptorSets_;
+	sqrp::GraphicsPipelineHandle forwardPipeline_;
+	std::unordered_map<std::string, std::vector<sqrp::DescriptorSetHandle>> geomDescriptorSets_;
+	sqrp::GraphicsPipelineHandle geomPipeline_;
+	std::unordered_map<std::string, std::vector<sqrp::DescriptorSetHandle>> lightDescriptorSets_;
+	sqrp::GraphicsPipelineHandle lightPipeline_;
 
 	std::vector<sqrp::DescriptorSetHandle> skyboxDescriptorSets_;
 	sqrp::GraphicsPipelineHandle skyboxPipeline_;
@@ -116,9 +124,15 @@ private:
 	std::vector<sqrp::DescriptorSetHandle> toneMapDescriptorSets_;
 	sqrp::GraphicsPipelineHandle toneMapPipeline_;
 
+	std::vector<sqrp::DescriptorSetHandle> guiDescriptorSets_;
+
 	float sceneViewScaleX_ = 0.8f;
 	float sceneViewScaleY_ = 0.7f;
 
+	bool isShowGuizmo_ = true;
+	bool isModifiedRotation_ = false;
+	int renderMode_ = 1; // 0: Forward, 1: G-Buffer
+	ImGuizmo::OPERATION gizmoOperation_ = ImGuizmo::TRANSLATE;
 	float edgeThreshold_ = 20.0f; // ÉäÉTÉCÉYñ≥å¯ïù
 	std::array<int, 9> dir_ = { -1 /*None*/, 0/*Left*/, 1/*Right*/, 2/*Up*/, 3/*Down*/, 4/*UpLeft*/, 5/*UpRight*/, 6/*DownLeft*/, 7/*DownRight*/ };
 	int catchSceneDir_ = -1;
@@ -138,6 +152,7 @@ private:
 	uint32_t changedFilePanelWidth_ = filePanelWidth_;
 	uint32_t changedFilePanelHeight_ = filePanelHeight_;
 
+	void Recreate();
 
 public:
 	App(std::string appName = "tatter-renderer", unsigned int windowWidth = 1920, unsigned int windowHeight = 1080);

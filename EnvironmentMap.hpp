@@ -37,7 +37,7 @@ private:
    
 
 public:
-    EnvironmentMap(const sqrp::Device& device, std::string dir, std::string name, sqrp::ShaderHandle decode, sqrp::ShaderHandle envmap, sqrp::ShaderHandle irradiance, sqrp::ShaderHandle prefilter, sqrp::ShaderHandle brdfLUT);
+    EnvironmentMap(const sqrp::Device& device, std::string dir, std::string name, sqrp::ShaderHandle envmap, sqrp::ShaderHandle irradiance, sqrp::ShaderHandle prefilter, sqrp::ShaderHandle brdfLUT);
     ~EnvironmentMap() = default;
 
     sqrp::ImageHandle GetEnvMap() const;
