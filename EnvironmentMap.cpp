@@ -5,6 +5,9 @@ using namespace std;
 EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std::string name, sqrp::ShaderHandle envmap, sqrp::ShaderHandle irradiance, sqrp::ShaderHandle prefilter, sqrp::ShaderHandle brdfLUT)
     : pDevice_(&device), dir_(dir)
 {
+	std::filesystem::path path = dir + name;
+	name_ = path.stem().string();
+
     int w, h, c;
     //stbi_ldr_to_hdr_gamma(1.0f);
     float* hdr = stbi_loadf((dir + name).c_str(), &w, &h, &c, 4);
@@ -355,6 +358,11 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
             vk::AccessFlagBits::eShaderRead
         );
     });
+}
+
+std::string EnvironmentMap::GetName() const
+{
+    return name_;
 }
 
 sqrp::ImageHandle EnvironmentMap::GetEnvMap() const

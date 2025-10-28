@@ -5,8 +5,9 @@
 
 #include <nfd.hpp>
 
-#include "Material.hpp"
 #include "EnvironmentMap.hpp"
+#include "Material.hpp"
+#include "Scene.hpp"
 
 struct DetailCamera
 {
@@ -33,17 +34,6 @@ struct Light
 	glm::vec4 pos;
 	glm::vec4 color;
 };
-
-struct ModelData
-{
-	sqrp::MeshHandle mesh_ = nullptr;
-	MaterialHandle material_ = nullptr;
-};
-
-//struct ObjectData
-//{
-//	sqrp::
-//};
 
 class App : public sqrp::Application
 {
@@ -78,15 +68,20 @@ private:
 	sqrp::FrameBufferHandle presentFrameBuffer_;
 	/*sqrp::MeshHandle mesh_;
 	MaterialHandle material_;*/
-	std::unordered_map<std::string, ModelData> models_;
-	EnvMapHandle envMap_;
+	std::unordered_map<std::string, std::shared_ptr<ModelData>> models_;
+	std::unordered_map<std::string, EnvironmentMapHandle> envMaps_;
+
+	std::unordered_map<std::string, std::shared_ptr<ObjectData>> objectData_;
 
 	sqrp::Camera camera_;
 	Light light0_;
-	std::vector<sqrp::Object> objects_ = {};
+	//std::vector<sqrp::Object> objects_ = {};
+	std::vector<std::string> objectNames_ = {};
+	std::vector<std::string> envMapNames_ = {};
+
 
 	sqrp::BufferHandle cameraBuffer_;
-	sqrp::BufferHandle objectBuffer_;
+	//sqrp::BufferHandle objectBuffer_;
 	sqrp::BufferHandle lightBuffer_;
 	sqrp::BufferHandle colorBuffer_;
 	sqrp::BufferHandle detailCameraBuffer_;
@@ -129,6 +124,16 @@ private:
 	float sceneViewScaleX_ = 0.8f;
 	float sceneViewScaleY_ = 0.7f;
 
+	bool isNeedRecreate_ = false;
+	bool isNeedReloadModel_ = false;
+	bool isNeedReloadEnvMap_ = false;
+	bool isChangedEnvMap_ = false;
+	std::string newModelPath_ = "";
+	std::string newEnvMapPath_ = "";
+	int selectedObjectIndex_ = 0;
+	std::string selectedObjectName_ = "";
+	int selectedEnvMapIndex_ = 0;
+	std::string selectedEnvMapName_ = "";
 	bool isShowGuizmo_ = true;
 	bool isModifiedRotation_ = false;
 	int renderMode_ = 1; // 0: Forward, 1: G-Buffer
@@ -151,6 +156,7 @@ private:
 	uint32_t filePanelHeight_ = windowHeight_ * (1.0f - sceneViewScaleY_);
 	uint32_t changedFilePanelWidth_ = filePanelWidth_;
 	uint32_t changedFilePanelHeight_ = filePanelHeight_;
+	uint32_t inspectorHeight_ = windowHeight_ * 0.1f;
 
 	void Recreate();
 

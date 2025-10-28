@@ -21,6 +21,8 @@ class EnvironmentMap {
 private:
     const sqrp::Device* pDevice_ = nullptr;
 
+    std::string name_;
+
     std::string dir_;
 
     int width_, height_;
@@ -40,10 +42,11 @@ public:
     EnvironmentMap(const sqrp::Device& device, std::string dir, std::string name, sqrp::ShaderHandle envmap, sqrp::ShaderHandle irradiance, sqrp::ShaderHandle prefilter, sqrp::ShaderHandle brdfLUT);
     ~EnvironmentMap() = default;
 
+    std::string GetName() const;
     sqrp::ImageHandle GetEnvMap() const;
 	sqrp::ImageHandle GetIrradianceMap() const;
     sqrp::ImageHandle GetPrefilterMap() const;
 	sqrp::ImageHandle GetBrdfLUT() const;
 };
 
-using EnvMapHandle = std::shared_ptr<EnvironmentMap>;
+using EnvironmentMapHandle = std::shared_ptr<EnvironmentMap>;
