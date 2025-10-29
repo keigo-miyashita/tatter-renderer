@@ -20,19 +20,26 @@ struct DetailCamera
 	float farZ;
 };
 
-enum GuiDir : int
-{
-	None		= 0x00000000,
-	Left		= 0x00000001,
-	Right		= 0x00000010,
-	Up			= 0x00000100,
-	Down		= 0x00001000
-};
-
 struct Light
 {
 	glm::vec4 pos;
 	glm::vec4 color;
+};
+
+enum GuiDir : int
+{
+	None = 0x00000000,
+	Left = 0x00000001,
+	Right = 0x00000010,
+	Up = 0x00000100,
+	Down = 0x00001000
+};
+
+struct GuiWindowSize {
+	uint32_t width;
+	uint32_t height;
+	uint32_t changedWidth;
+	uint32_t changedHeight;
 };
 
 class App : public sqrp::Application
@@ -52,22 +59,18 @@ private:
 	std::vector<sqrp::ImageHandle> renderImages_;
 	std::vector<sqrp::ImageHandle> toneMappedImages_;
 
-	sqrp::RenderPassHandle renderPass_;
 	sqrp::RenderPassHandle forwardRenderPass_;
 	sqrp::RenderPassHandle geometryRenderPass_;
 	sqrp::RenderPassHandle lightingRenderPass_;
 	sqrp::RenderPassHandle skyboxRenderPass_;
 	sqrp::RenderPassHandle toneMapRenderPass_;
 	sqrp::RenderPassHandle presentRenderPass_;
-	sqrp::FrameBufferHandle	frameBuffer_;
 	sqrp::FrameBufferHandle	forwardFrameBuffer_;
 	sqrp::FrameBufferHandle	geometryFrameBuffer_;
 	sqrp::FrameBufferHandle	lightingFrameBuffer_;
 	sqrp::FrameBufferHandle skyboxFrameBuffer_;
 	sqrp::FrameBufferHandle toneMapFrameBuffer_;
 	sqrp::FrameBufferHandle presentFrameBuffer_;
-	/*sqrp::MeshHandle mesh_;
-	MaterialHandle material_;*/
 	std::unordered_map<std::string, std::shared_ptr<ModelData>> models_;
 	std::unordered_map<std::string, EnvironmentMapHandle> envMaps_;
 
@@ -75,19 +78,14 @@ private:
 
 	sqrp::Camera camera_;
 	Light light0_;
-	//std::vector<sqrp::Object> objects_ = {};
 	std::vector<std::string> objectNames_ = {};
 	std::vector<std::string> envMapNames_ = {};
 
-
 	sqrp::BufferHandle cameraBuffer_;
-	//sqrp::BufferHandle objectBuffer_;
 	sqrp::BufferHandle lightBuffer_;
 	sqrp::BufferHandle colorBuffer_;
 	sqrp::BufferHandle detailCameraBuffer_;
 
-	sqrp::ShaderHandle vertShader_;
-	sqrp::ShaderHandle pixelShader_;
 	sqrp::ShaderHandle forwardVertShader_;
 	sqrp::ShaderHandle forwardPixelShader_;
 	sqrp::ShaderHandle geomVertShader_;
@@ -102,9 +100,6 @@ private:
 	sqrp::ShaderHandle skyboxPixelShader_;
 	sqrp::ShaderHandle toneMapVertShader_;
 	sqrp::ShaderHandle toneMapPixelShader_;
-
-	sqrp::DescriptorSetHandle descriptorSet_;
-	sqrp::GraphicsPipelineHandle pipeline_;
 
 	std::unordered_map<std::string, std::vector<sqrp::DescriptorSetHandle>> forwardDescriptorSets_;
 	sqrp::GraphicsPipelineHandle forwardPipeline_;
@@ -144,20 +139,35 @@ private:
 	int catchPanelDir_ = -1;
 	int catchFilePanelDir_ = -1;
 
-	uint32_t sceneWidth_ = windowWidth_ * sceneViewScaleX_;
-	uint32_t sceneHeight_ = windowHeight_ * sceneViewScaleY_;
-	uint32_t changedSceneWidth_ = sceneWidth_;
-	uint32_t changedSceneHeight_ = sceneHeight_;
-	uint32_t panelWidth_ = windowWidth_ * (1.0f - sceneViewScaleX_);
-	uint32_t panelHeight_ = windowHeight_;
-	uint32_t changedPanelWidth_ = panelWidth_;
-	uint32_t changedPanelHeight_ = panelHeight_;
-	uint32_t filePanelWidth_ = windowWidth_ * sceneViewScaleX_;
-	uint32_t filePanelHeight_ = windowHeight_ * (1.0f - sceneViewScaleY_);
-	uint32_t changedFilePanelWidth_ = filePanelWidth_;
-	uint32_t changedFilePanelHeight_ = filePanelHeight_;
+	GuiWindowSize sceneViewSize_ = {
+		(uint32_t)(windowWidth_ * sceneViewScaleX_),
+		(uint32_t)(windowHeight_ * sceneViewScaleY_),
+		(uint32_t)(windowWidth_ * sceneViewScaleX_),
+		(uint32_t)(windowHeight_ * sceneViewScaleY_)
+	};
+	GuiWindowSize inspectorViewSize_ = {
+		(uint32_t)(windowWidth_ * (1.0f - sceneViewScaleX_)),
+		(uint32_t)(windowHeight_),
+		(uint32_t)(windowWidth_ * (1.0f - sceneViewScaleX_)),
+		(uint32_t)(windowHeight_)
+	};
+	GuiWindowSize filePanelSize_ = {
+		(uint32_t)(windowWidth_ * sceneViewScaleX_),
+		(uint32_t)(windowHeight_ * (1.0f - sceneViewScaleY_)),
+		(uint32_t)(windowWidth_ * sceneViewScaleX_),
+		(uint32_t)(windowHeight_ * (1.0f - sceneViewScaleY_))
+	};
 	uint32_t inspectorHeight_ = windowHeight_ * 0.1f;
 
+	sqrp::ImageHandle potisionIconImage_;
+	sqrp::DescriptorSetHandle potisionIconDescSet_;
+	sqrp::ImageHandle rotationIconImage_;
+	sqrp::DescriptorSetHandle rotationIconDescSet_;
+	sqrp::ImageHandle scaleIconImage_;
+	sqrp::DescriptorSetHandle scaleIconDescSet_;
+
+	sqrp::ImageHandle CreateIcon(std::string path);
+	void DefineGUIStyle();
 	void Recreate();
 
 public:

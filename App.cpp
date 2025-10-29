@@ -3,6 +3,102 @@
 using namespace std;
 using namespace sqrp;
 
+sqrp::ImageHandle App::CreateIcon(std::string path)
+{
+	int texWidth = 0, texHeight = 0, texChannels = 0;
+	stbi_uc* pixels = stbi_load(path.c_str(), & texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+	if (!pixels) {
+		fprintf(stderr, "Failed to load image %s\n", path);
+		throw std::runtime_error("Failed to load image");
+	}
+
+	std::vector<uint8_t> data(pixels, pixels + texWidth * texHeight * 4); // RGBA
+	/*for (int i = 0; i < texWidth * texHeight * 4; i++) {
+		data[i] = pixels[i] / 255.0f;
+	}*/
+	stbi_image_free(pixels);
+
+
+	sqrp::BufferHandle stagingBuffer = device_.CreateBuffer(texWidth * texHeight * 4 * sizeof(uint8_t), vk::BufferUsageFlagBits::eTransferSrc, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
+	stagingBuffer->Write(data.data(), texWidth * texHeight * 4 * sizeof(uint8_t));
+
+	vk::ImageCreateInfo iconImageInfo = {};
+	iconImageInfo
+		.setImageType(vk::ImageType::e2D)
+		.setFormat(vk::Format::eR8G8B8A8Srgb)
+		.setExtent(vk::Extent3D{ static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1 })
+		.setMipLevels(1)
+		.setArrayLayers(1)
+		.setSamples(vk::SampleCountFlagBits::e1)
+		.setTiling(vk::ImageTiling::eOptimal)
+		.setUsage(vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst)
+		.setSharingMode(vk::SharingMode::eExclusive)
+		.setInitialLayout(vk::ImageLayout::eUndefined);
+	vk::SamplerCreateInfo iconSamplerInfo = {};
+	iconSamplerInfo
+		.setAddressModeU(vk::SamplerAddressMode::eRepeat)
+		.setAddressModeV(vk::SamplerAddressMode::eRepeat)
+		.setAddressModeW(vk::SamplerAddressMode::eRepeat)
+		.setMagFilter(vk::Filter::eLinear)
+		.setMinFilter(vk::Filter::eLinear)
+		.setMipmapMode(vk::SamplerMipmapMode::eLinear)
+		.setMaxLod(1.0f)
+		.setMinLod(0.0f)
+		.setBorderColor(vk::BorderColor::eFloatOpaqueBlack);
+	sqrp::ImageHandle iconTexture = device_.CreateImage(
+		path,
+		iconImageInfo,
+		vk::ImageAspectFlagBits::eColor,
+		iconSamplerInfo
+	);
+
+	device_.OneTimeSubmit([&](sqrp::CommandBufferHandle pCommandBuffer) {
+		pCommandBuffer->TransitionLayout(iconTexture, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+		pCommandBuffer->CopyBufferToImage(stagingBuffer, iconTexture);
+		pCommandBuffer->TransitionLayout(iconTexture, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+	});
+
+	return iconTexture;
+}
+
+void App::DefineGUIStyle()
+{
+	ImGuiStyle& style = ImGui::GetStyle();
+
+	// 全体の色を取得して変更
+	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.02f, 0.02f, 0.02f, 1.0f);   // ウィンドウ背景
+	// 通常のタイトルバー背景
+	style.Colors[ImGuiCol_TitleBg] = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); // 緑
+
+	// アクティブなウィンドウのタイトルバー背景
+	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); // 少し明るい緑
+	style.Colors[ImGuiCol_Header] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
+	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
+	style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
+
+	// ボタン
+	style.Colors[ImGuiCol_Button] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);        // 通常
+	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.3f, 0.5f, 0.7f, 1.0f); // ホバー
+	style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.1f, 0.3f, 0.5f, 1.0f);  // 押下中
+
+	// Selectable
+	style.Colors[ImGuiCol_Header] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);           // 通常
+	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.3f, 0.5f, 0.7f, 1.0f);    // ホバー
+	style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.1f, 0.3f, 0.5f, 1.0f);     // 選択中
+
+	// Checkbox (チェックボックス)
+	//style.Colors[ImGuiCol_CheckMark] = ImVec4(0.8f, 0.2f, 0.2f, 1.0f);       // チェックマークの色
+	style.Colors[ImGuiCol_FrameBg] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);         // 背景
+	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);  // ホバー
+	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);   // 押下中
+
+	// InputFloat3（入力欄）
+	style.Colors[ImGuiCol_FrameBg] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
+	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
+	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
+	//style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // テキスト色
+}
+
 void App::Recreate()
 {
 	device_.WaitIdle(QueueContextType::General);
@@ -43,20 +139,20 @@ void App::Recreate()
 		.setUnnormalizedCoordinates(VK_FALSE);
 
 	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
-		baseColorMetallnessImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-		normalRoughnessImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-		emissiveAOImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-		depthImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-		renderImages_[i]->Recreate(sceneWidth_, sceneHeight_);
-		toneMappedImages_[i]->Recreate(sceneWidth_, sceneHeight_);
+		baseColorMetallnessImages_[i]->Recreate(sceneViewSize_.width, sceneViewSize_.height);
+		normalRoughnessImages_[i]->Recreate(sceneViewSize_.width, sceneViewSize_.height);
+		emissiveAOImages_[i]->Recreate(sceneViewSize_.width, sceneViewSize_.height);
+		depthImages_[i]->Recreate(sceneViewSize_.width, sceneViewSize_.height);
+		renderImages_[i]->Recreate(sceneViewSize_.width, sceneViewSize_.height);
+		toneMappedImages_[i]->Recreate(sceneViewSize_.width, sceneViewSize_.height);
 	}
 
 	swapchain_->Recreate(windowWidth_, windowHeight_);
-	forwardFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
-	geometryFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
-	lightingFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
-	skyboxFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
-	toneMapFrameBuffer_->Recreate(sceneWidth_, sceneHeight_);
+	forwardFrameBuffer_->Recreate(sceneViewSize_.width, sceneViewSize_.height);
+	geometryFrameBuffer_->Recreate(sceneViewSize_.width, sceneViewSize_.height);
+	lightingFrameBuffer_->Recreate(sceneViewSize_.width, sceneViewSize_.height);
+	skyboxFrameBuffer_->Recreate(sceneViewSize_.width, sceneViewSize_.height);
+	toneMapFrameBuffer_->Recreate(sceneViewSize_.width, sceneViewSize_.height);
 	presentFrameBuffer_->Recreate(windowWidth_, windowHeight_);
 
 	forwardDescriptorSets_.clear();
@@ -182,8 +278,6 @@ void App::OnStart()
 
 	swapchain_ = device_.CreateSwapchain(windowWidth_, windowHeight_);
 
-	renderPass_ = device_.CreateRenderPass(swapchain_, false);
-
 	std::array<vk::Format, 3> gbufferFormats = {
 		vk::Format::eR8G8B8A8Unorm,     // BaseColor + Metalness
 		vk::Format::eR8G8B8A8Unorm, // Normal + Roughness
@@ -234,7 +328,7 @@ void App::OnStart()
 	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
 		baseColorMetallnessImages_[i] = device_.CreateImage(
 			"BaseColorMetallness" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::Extent3D{ sceneViewSize_.width, sceneViewSize_.height, 1 },
 			vk::ImageType::e2D,
 			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 			vk::Format::eR8G8B8A8Unorm,
@@ -248,7 +342,7 @@ void App::OnStart()
 
 		normalRoughnessImages_[i] = device_.CreateImage(
 			"NormalRoughness" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::Extent3D{ sceneViewSize_.width, sceneViewSize_.height, 1 },
 			vk::ImageType::e2D,
 			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 			vk::Format::eR8G8B8A8Unorm,
@@ -262,7 +356,7 @@ void App::OnStart()
 
 		emissiveAOImages_[i] = device_.CreateImage(
 			"EmissiveAO" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::Extent3D{ sceneViewSize_.width, sceneViewSize_.height, 1 },
 			vk::ImageType::e2D,
 			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 			vk::Format::eR8G8B8A8Unorm,
@@ -276,7 +370,7 @@ void App::OnStart()
 
 		depthImages_[i] = device_.CreateImage(
 			"Depth" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::Extent3D{ sceneViewSize_.width, sceneViewSize_.height, 1 },
 			vk::ImageType::e2D,
 			vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
 			vk::Format::eD32Sfloat,
@@ -290,7 +384,7 @@ void App::OnStart()
 
 		renderImages_[i] = device_.CreateImage(
 			"Render" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::Extent3D{ sceneViewSize_.width, sceneViewSize_.height, 1 },
 			vk::ImageType::e2D,
 			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 			vk::Format::eR16G16B16A16Sfloat,
@@ -304,7 +398,7 @@ void App::OnStart()
 
 		toneMappedImages_[i] = device_.CreateImage(
 			"toneMapped" + to_string(i),
-			vk::Extent3D{ sceneWidth_, sceneHeight_, 1 },
+			vk::Extent3D{ sceneViewSize_.width, sceneViewSize_.height, 1 },
 			vk::ImageType::e2D,
 			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 			swapchain_->GetSurfaceFormat(),
@@ -487,16 +581,14 @@ void App::OnStart()
 		{ presentSubpass }, presentAttachmentNameToInfo
 	);
 
-	frameBuffer_ = device_.CreateFrameBuffer(renderPass_, swapchain_);
-
 	forwardFrameBuffer_ = device_.CreateFrameBuffer(
 		forwardRenderPass_,
 		{
 			{ renderImages_ },
 			{ depthImages_ }
 		},
-		sceneWidth_,
-		sceneHeight_,
+		sceneViewSize_.width,
+		sceneViewSize_.height,
 		swapchain_->GetInflightCount()
 	);
 
@@ -508,8 +600,8 @@ void App::OnStart()
 			{ emissiveAOImages_},
 			{ depthImages_}
 		},
-		sceneWidth_,
-		sceneHeight_,
+		sceneViewSize_.width,
+		sceneViewSize_.height,
 		swapchain_->GetInflightCount()
 	);
 
@@ -518,8 +610,8 @@ void App::OnStart()
 		{
 			{ renderImages_ },
 		},
-		sceneWidth_,
-		sceneHeight_,
+		sceneViewSize_.width,
+		sceneViewSize_.height,
 		swapchain_->GetInflightCount()
 	);
 
@@ -529,8 +621,8 @@ void App::OnStart()
 			{ renderImages_ },
 			{ depthImages_ }
 		},
-		sceneWidth_,
-		sceneHeight_,
+		sceneViewSize_.width,
+		sceneViewSize_.height,
 		swapchain_->GetInflightCount()
 	);
 
@@ -539,8 +631,8 @@ void App::OnStart()
 		{
 			{ toneMappedImages_ }
 		},
-		sceneWidth_,
-		sceneHeight_,
+		sceneViewSize_.width,
+		sceneViewSize_.height,
 		swapchain_->GetInflightCount()
 	);
 
@@ -552,19 +644,14 @@ void App::OnStart()
 
 	MeshHandle mesh = device_.CreateMesh(string(MODEL_DIR) + "DamagedHelmet.gltf");
 	MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR), "DamagedHelmet.gltf");
-	//cout << "model.numInstances: " << modelData.GetNumInstance() << endl;
 	models_.emplace(
 		mesh->GetName(),
 		std::make_shared<ModelData>(mesh, material)
 	);
-	/*models_["DamagedHelmet"].GetMesh() = device_.CreateMesh(string(MODEL_DIR) + "DamagedHelmet.gltf");
-	models_["DamagedHelmet"].GetMaterial() = std::make_shared<Material>(device_, string(MODEL_DIR), "DamagedHelmet.gltf");*/
-	/*mesh_ = device_.CreateMesh(string(MODEL_DIR) + "DamagedHelmet.gltf");
-	material_ = std::make_shared<Material>(device_, string(MODEL_DIR), "DamagedHelmet.gltf");*/
 
 
 	// Camera
-	camera_.Init((float)sceneWidth_ / (float)sceneHeight_, glm::vec3(0.0f, 0.0f, 5.0f)); // Note sign
+	camera_.Init((float)sceneViewSize_.width / (float)sceneViewSize_.height, glm::vec3(0.0f, 0.0f, 5.0f)); // Note sign
 
 	// Light
 	light0_.pos = glm::vec4(10.0f, 10.0f, 5.0f, 1.0f);
@@ -576,29 +663,16 @@ void App::OnStart()
 	cameraBuffer_ = device_.CreateBuffer(sizeof(CameraMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	cameraBuffer_->Write(CameraMatrix{ camera_.GetView(), camera_.GetProj() });
 
-	//objects_.push_back(sqrp::Object(
-	//	models_["DamagedHelmet"].GetMesh(),
-	//	glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
-	//	glm::quat(glm::vec3(0.0f, 0.0f, 0.0f)),
-	//	1.0f
-	//));
-	//objectBuffer_ = device_.CreateBuffer(sizeof(TransformMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
-	////objectBuffer_->Write(object_);
-	//objectBuffer_->Write(objects_[0].GetTransform());
-
 	std::shared_ptr<ObjectData> objData = std::make_shared<ObjectData>(
 		device_, models_.at("DamagedHelmet"),
 		glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
 		glm::quat(glm::vec3(0.0f, 0.0f, 0.0f)),
 		1.0f
 	);
-	//cout << "objData.GetModelData().GetNumInstance() = " << objData.GetPModelData()->GetNumInstance() << endl;
-	/*objectData_[objData.GetName()] = objData;*/
 	objectData_.emplace(
 		objData->GetName(),
 		objData
 	);
-	//objectData_.insert({ objData.GetName(), objData});
 	objectNames_.push_back(objData->GetName());
 	selectedObjectName_ = objectNames_[0];
 
@@ -610,17 +684,6 @@ void App::OnStart()
 
 	detailCameraBuffer_ = device_.CreateBuffer(sizeof(DetailCamera), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	detailCameraBuffer_->Write(DetailCamera{ camera_.GetView(), camera_.GetProj(), camera_.GetInvView(), camera_.GetInvProj(), camera_.GetPos(), camera_.GetNearClip(), camera_.GetFarClip()});
-
-	/*descriptorSet_ = device_.CreateDescriptorSet({
-		{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-		{ objectData_.at("DamagedHelmet").GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-		{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-		{ colorBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }
-		}
-	);*/
-
-	vertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "Lambert.shader", sqrp::ShaderType::Vertex);
-	pixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "Lambert.shader", sqrp::ShaderType::Pixel);
 
 	forwardVertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "forward.shader", sqrp::ShaderType::Vertex);
 	forwardPixelShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "forward.shader", sqrp::ShaderType::Pixel);
@@ -644,8 +707,6 @@ void App::OnStart()
 	envMapNames_.push_back(envMap->GetName());
 	selectedEnvMapName_ = envMapNames_[0];
 
-	//pipeline_ = device_.CreateGraphicsPipeline(renderPass_, swapchain_, vertShader_, pixelShader_, descriptorSet_);
-	
 	for (auto& [name, objectData] : objectData_) {
 		forwardDescriptorSets_[name].resize(swapchain_->GetInflightCount());
 		geomDescriptorSets_[name].resize(swapchain_->GetInflightCount());
@@ -747,57 +808,78 @@ void App::OnStart()
 
 	gui_ = device_.CreateGUI(pWindow_, swapchain_, presentRenderPass_);
 
-	panelWidth_ = windowWidth_ - sceneWidth_;
-	panelHeight_ = windowHeight_;
-	filePanelWidth_ = sceneWidth_;
-	filePanelHeight_ = windowHeight_ - sceneHeight_;
-	changedSceneWidth_ = sceneWidth_;
-	changedSceneHeight_ = sceneHeight_;
-	changedPanelWidth_ = panelWidth_;
-	changedPanelHeight_ = panelHeight_;
-	changedFilePanelWidth_ = filePanelWidth_;
-	changedFilePanelHeight_ = filePanelHeight_;
+	DefineGUIStyle();
+
+	inspectorViewSize_.width = windowWidth_ - sceneViewSize_.width;
+	inspectorViewSize_.height = windowHeight_;
+	filePanelSize_.width = sceneViewSize_.width;
+	filePanelSize_.height = windowHeight_ - sceneViewSize_.height;
+	sceneViewSize_.changedWidth = sceneViewSize_.width;
+	sceneViewSize_.changedHeight = sceneViewSize_.height;
+	inspectorViewSize_.changedWidth = inspectorViewSize_.width;
+	inspectorViewSize_.changedHeight = inspectorViewSize_.height;
+	filePanelSize_.changedWidth = filePanelSize_.width;
+	filePanelSize_.changedHeight = filePanelSize_.height;
+
+	potisionIconImage_ = CreateIcon("C:\\projects\\Vulkan\\tatter-renderer\\icon\\translate.png");
+	rotationIconImage_ = CreateIcon("C:\\projects\\Vulkan\\tatter-renderer\\icon\\rotation.png");
+	scaleIconImage_ = CreateIcon("C:\\projects\\Vulkan\\tatter-renderer\\icon\\scale.png");
+
+	potisionIconDescSet_ = device_.CreateDescriptorSet({
+		{ potisionIconImage_, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment }
+		}
+	);
+
+	rotationIconDescSet_ = device_.CreateDescriptorSet({
+		{ rotationIconImage_, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment }
+		}
+	);
+
+	scaleIconDescSet_ = device_.CreateDescriptorSet({
+		{ scaleIconImage_, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment }
+		}
+	);
 }
 
 void App::OnUpdate()
 {	
 	bool isChangedSceneSize = false;
-	if (changedSceneWidth_ != sceneWidth_ && !isChangedSceneSize) {
-		sceneWidth_ = changedSceneWidth_;
-		panelWidth_ = windowWidth_ - sceneWidth_;
-		filePanelWidth_ = sceneWidth_;
+	if (sceneViewSize_.changedWidth != sceneViewSize_.width && !isChangedSceneSize) {
+		sceneViewSize_.width = sceneViewSize_.changedWidth;
+		inspectorViewSize_.width = windowWidth_ - sceneViewSize_.width;
+		filePanelSize_.width = sceneViewSize_.width;
 		cout << "Change scene width" << endl;
 		isChangedSceneSize = true;
 	}
-	if (changedSceneHeight_ != sceneHeight_ && !isChangedSceneSize) {
-		cout << "Scene height = " << sceneHeight_ << endl;
-		cout << "changedSceneHeight_ = " << changedSceneHeight_ << endl;
-		sceneHeight_ = changedSceneHeight_;
-		filePanelHeight_ = windowHeight_ - sceneHeight_;
-		cout << "Scene height = " << sceneHeight_ << endl;
+	if (sceneViewSize_.changedHeight != sceneViewSize_.height && !isChangedSceneSize) {
+		cout << "Scene height = " << sceneViewSize_.height << endl;
+		cout << "sceneViewSize_.changedHeight = " << sceneViewSize_.changedHeight << endl;
+		sceneViewSize_.height = sceneViewSize_.changedHeight;
+		filePanelSize_.height = windowHeight_ - sceneViewSize_.height;
+		cout << "Scene height = " << sceneViewSize_.height << endl;
 		isChangedSceneSize = true;
 	}
-	if (changedPanelWidth_ != panelWidth_ && !isChangedSceneSize) {
-		panelWidth_ = changedPanelWidth_;
-		sceneWidth_ = windowWidth_ - panelWidth_;
-		filePanelWidth_ = sceneWidth_;
-		filePanelHeight_ = windowHeight_ - sceneHeight_;
+	if (inspectorViewSize_.changedWidth != inspectorViewSize_.width && !isChangedSceneSize) {
+		inspectorViewSize_.width = inspectorViewSize_.changedWidth;
+		sceneViewSize_.width = windowWidth_ - inspectorViewSize_.width;
+		filePanelSize_.width = sceneViewSize_.width;
+		filePanelSize_.height = windowHeight_ - sceneViewSize_.height;
 		cout << "change panel" << endl;
 		isChangedSceneSize = true;
 	}
-	if (changedFilePanelHeight_ != filePanelHeight_ && !isChangedSceneSize) {
+	if (filePanelSize_.changedHeight != filePanelSize_.height && !isChangedSceneSize) {
 		cout << "change file panel" << endl;
-		filePanelHeight_ = changedFilePanelHeight_;
-		sceneHeight_ = windowHeight_ - filePanelHeight_;
-		sceneWidth_ = filePanelWidth_;
-		panelWidth_ = windowWidth_ - sceneWidth_;
+		filePanelSize_.height = filePanelSize_.changedHeight;
+		sceneViewSize_.height = windowHeight_ - filePanelSize_.height;
+		sceneViewSize_.width = filePanelSize_.width;
+		inspectorViewSize_.width = windowWidth_ - sceneViewSize_.width;
 		isChangedSceneSize = true;
 	}
-	if (changedFilePanelWidth_ != filePanelWidth_ && !isChangedSceneSize) {
+	if (filePanelSize_.changedWidth != filePanelSize_.width && !isChangedSceneSize) {
 		cout << "change file panel" << endl;
-		filePanelWidth_ = changedFilePanelWidth_;
-		sceneWidth_ = filePanelWidth_;
-		panelWidth_ = windowWidth_ - sceneWidth_;
+		filePanelSize_.width = filePanelSize_.changedWidth;
+		sceneViewSize_.width = filePanelSize_.width;
+		inspectorViewSize_.width = windowWidth_ - sceneViewSize_.width;
 		isChangedSceneSize = true;
 	}
 
@@ -810,7 +892,6 @@ void App::OnUpdate()
 		device_.WaitIdle(sqrp::QueueContextType::General);
 		MeshHandle mesh = device_.CreateMesh(string(MODEL_DIR) + newModelPath_);
 		MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR), newModelPath_);
-		//cout << "model.numInstances: " << modelData.GetNumInstance() << endl;
 		models_.emplace(
 			mesh->GetName(),
 			std::make_shared<ModelData>(mesh, material)
@@ -829,13 +910,12 @@ void App::OnUpdate()
 		isChangedEnvMap_ = false;
 	}
 
-	camera_.Update(sceneWidth_, sceneHeight_);
+	camera_.Update(sceneViewSize_.width, sceneViewSize_.height);
 	cameraBuffer_->Write(CameraMatrix{ camera_.GetView(), camera_.GetProj() });
 	detailCameraBuffer_->Write(DetailCamera{ camera_.GetView(), camera_.GetProj(), camera_.GetInvView(), camera_.GetInvProj(), camera_.GetPos(), camera_.GetNearClip(), camera_.GetFarClip() });
 	for (auto& [name, objectData] : objectData_) {
 		objectData->GetObjectBuffer()->Write(objectData->GetTransform());
 	}
-	//objectData_.at("DamagedHelmet0").GetObjectBuffer()->Write(objectData_.at("DamagedHelmet0").GetTransform());
 
 	swapchain_->WaitFrame();
 
@@ -856,8 +936,8 @@ void App::OnUpdate()
 
 	if (renderMode_ == 1) {
 		commandBuffer->BeginRenderPass(geometryRenderPass_, geometryFrameBuffer_, infligtIndex);
-		commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
-		commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
+		commandBuffer->SetViewport(sceneViewSize_.width, sceneViewSize_.height);
+		commandBuffer->SetScissor(sceneViewSize_.width, sceneViewSize_.height);
 		commandBuffer->BindPipeline(geomPipeline_, vk::PipelineBindPoint::eGraphics);
 		for (auto& [objectName, objectData] : objectData_) {
 			std::string meshName = objectData->GetPModelData()->GetMesh()->GetName();
@@ -906,8 +986,8 @@ void App::OnUpdate()
 		);
 
 		commandBuffer->BeginRenderPass(lightingRenderPass_, lightingFrameBuffer_, infligtIndex);
-		commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
-		commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
+		commandBuffer->SetViewport(sceneViewSize_.width, sceneViewSize_.height);
+		commandBuffer->SetScissor(sceneViewSize_.width, sceneViewSize_.height);
 		commandBuffer->BindPipeline(lightPipeline_, vk::PipelineBindPoint::eGraphics);
 		for (auto& [objectName, objectData] : objectData_) {
 			std::string meshName = objectData->GetPModelData()->GetMesh()->GetName();
@@ -918,8 +998,8 @@ void App::OnUpdate()
 	}
 	else if (renderMode_ == 0) {
 		commandBuffer->BeginRenderPass(forwardRenderPass_, forwardFrameBuffer_, infligtIndex);
-		commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
-		commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
+		commandBuffer->SetViewport(sceneViewSize_.width, sceneViewSize_.height);
+		commandBuffer->SetScissor(sceneViewSize_.width, sceneViewSize_.height);
 		commandBuffer->BindPipeline(forwardPipeline_, vk::PipelineBindPoint::eGraphics);
 		for (auto& [objectName, objectData] : objectData_) {
 			std::string meshName = objectData->GetPModelData()->GetMesh()->GetName();
@@ -931,80 +1011,9 @@ void App::OnUpdate()
 		commandBuffer->EndRenderPass();
 	}
 
-	//for (auto& [objectName, objectData] : objectData_) {
-	//	std::string meshName = objectData->GetPModelData()->GetMesh()->GetName();
-	//	if (renderMode_ == 1) {
-	//		commandBuffer->BeginRenderPass(geometryRenderPass_, geometryFrameBuffer_, infligtIndex);
-	//		commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
-	//		commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
-	//		commandBuffer->BindPipeline(geomPipeline_, vk::PipelineBindPoint::eGraphics);
-	//		commandBuffer->BindDescriptorSet(geomPipeline_, geomDescriptorSets_[objectName][infligtIndex], vk::PipelineBindPoint::eGraphics);
-	//		commandBuffer->PushConstants(geomPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), models_.at(meshName)->GetMaterial()->GetPFactors());
-	//		commandBuffer->BindMeshBuffer(models_.at(meshName)->GetMesh());
-	//		commandBuffer->DrawMesh(models_.at(meshName)->GetMesh());
-	//		commandBuffer->EndRenderPass();
-
-	//		commandBuffer->ImageBarrier(
-	//			baseColorMetallnessImages_[infligtIndex],
-	//			vk::ImageLayout::eShaderReadOnlyOptimal,
-	//			vk::ImageLayout::eShaderReadOnlyOptimal,
-	//			vk::PipelineStageFlagBits::eColorAttachmentOutput,
-	//			vk::PipelineStageFlagBits::eFragmentShader,
-	//			vk::AccessFlagBits::eColorAttachmentWrite,
-	//			vk::AccessFlagBits::eShaderRead
-	//		);
-	//		commandBuffer->ImageBarrier(
-	//			normalRoughnessImages_[infligtIndex],
-	//			vk::ImageLayout::eShaderReadOnlyOptimal,
-	//			vk::ImageLayout::eShaderReadOnlyOptimal,
-	//			vk::PipelineStageFlagBits::eColorAttachmentOutput,
-	//			vk::PipelineStageFlagBits::eFragmentShader,
-	//			vk::AccessFlagBits::eColorAttachmentWrite,
-	//			vk::AccessFlagBits::eShaderRead
-	//		);
-	//		commandBuffer->ImageBarrier(
-	//			emissiveAOImages_[infligtIndex],
-	//			vk::ImageLayout::eShaderReadOnlyOptimal,
-	//			vk::ImageLayout::eShaderReadOnlyOptimal,
-	//			vk::PipelineStageFlagBits::eColorAttachmentOutput,
-	//			vk::PipelineStageFlagBits::eFragmentShader,
-	//			vk::AccessFlagBits::eColorAttachmentWrite,
-	//			vk::AccessFlagBits::eShaderRead
-	//		);
-	//		commandBuffer->ImageBarrier(
-	//			depthImages_[infligtIndex],
-	//			vk::ImageLayout::eShaderReadOnlyOptimal,
-	//			vk::ImageLayout::eShaderReadOnlyOptimal,
-	//			vk::PipelineStageFlagBits::eLateFragmentTests,
-	//			vk::PipelineStageFlagBits::eFragmentShader,
-	//			vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-	//			vk::AccessFlagBits::eShaderRead
-	//		);
-
-	//		commandBuffer->BeginRenderPass(lightingRenderPass_, lightingFrameBuffer_, infligtIndex);
-	//		commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
-	//		commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
-	//		commandBuffer->BindPipeline(lightPipeline_, vk::PipelineBindPoint::eGraphics);
-	//		commandBuffer->BindDescriptorSet(lightPipeline_, lightDescriptorSets_[objectName][infligtIndex], vk::PipelineBindPoint::eGraphics);
-	//		commandBuffer->Draw(3, 1); // Fullscreen Triangle
-	//		commandBuffer->EndRenderPass();
-	//	}
-	//	else if (renderMode_ == 0) {
-	//		commandBuffer->BeginRenderPass(forwardRenderPass_, forwardFrameBuffer_, infligtIndex);
-	//		commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
-	//		commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
-	//		commandBuffer->BindPipeline(forwardPipeline_, vk::PipelineBindPoint::eGraphics);
-	//		commandBuffer->BindDescriptorSet(forwardPipeline_, forwardDescriptorSets_[objectName][infligtIndex], vk::PipelineBindPoint::eGraphics);
-	//		commandBuffer->PushConstants(forwardPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), models_.at(meshName)->GetMaterial()->GetPFactors());
-	//		commandBuffer->BindMeshBuffer(models_.at(meshName)->GetMesh());
-	//		commandBuffer->DrawMesh(models_.at(meshName)->GetMesh());
-	//		commandBuffer->EndRenderPass();
-	//	}
-	//}
-
 	commandBuffer->BeginRenderPass(skyboxRenderPass_, skyboxFrameBuffer_, infligtIndex);
-	commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
-	commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
+	commandBuffer->SetViewport(sceneViewSize_.width, sceneViewSize_.height);
+	commandBuffer->SetScissor(sceneViewSize_.width, sceneViewSize_.height);
 	commandBuffer->BindPipeline(skyboxPipeline_, vk::PipelineBindPoint::eGraphics);
 	commandBuffer->BindDescriptorSet(skyboxPipeline_, skyboxDescriptorSets_[infligtIndex], vk::PipelineBindPoint::eGraphics);
 	commandBuffer->Draw(3, 1); // Fullscreen Triangle
@@ -1021,8 +1030,8 @@ void App::OnUpdate()
 	);
 
 	commandBuffer->BeginRenderPass(toneMapRenderPass_, toneMapFrameBuffer_, infligtIndex);
-	commandBuffer->SetViewport(sceneWidth_, sceneHeight_);
-	commandBuffer->SetScissor(sceneWidth_, sceneHeight_);
+	commandBuffer->SetViewport(sceneViewSize_.width, sceneViewSize_.height);
+	commandBuffer->SetScissor(sceneViewSize_.width, sceneViewSize_.height);
 	commandBuffer->BindPipeline(toneMapPipeline_, vk::PipelineBindPoint::eGraphics);
 	commandBuffer->BindDescriptorSet(toneMapPipeline_, toneMapDescriptorSets_[infligtIndex], vk::PipelineBindPoint::eGraphics);
 	commandBuffer->Draw(3, 1); // Fullscreen Triangle
@@ -1059,7 +1068,7 @@ void App::OnUpdate()
 	}
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::SetNextWindowPos(ImVec2(0, 0));
-	ImGui::SetNextWindowSize(ImVec2(sceneWidth_, sceneHeight_));
+	ImGui::SetNextWindowSize(ImVec2(sceneViewSize_.width, sceneViewSize_.height));
 	ImGui::Begin("Scene", nullptr, sceneWindowFlag);
 	ImVec2 size = ImGui::GetWindowSize();
 	if (ImGui::IsWindowHovered()) {
@@ -1084,8 +1093,8 @@ void App::OnUpdate()
 	else {
 		catchSceneDir_ = GuiDir::None;
 	}
-	changedSceneWidth_ = size.x;
-	changedSceneHeight_ = size.y;
+	sceneViewSize_.changedWidth = size.x;
+	sceneViewSize_.changedHeight = size.y;
 	ImVec2 contentSize = ImGui::GetContentRegionAvail();
 	ImTextureID texId = (ImTextureID)((VkDescriptorSet)guiDescriptorSets_[infligtIndex]->GetDescriptorSet());
 	ImGui::Image(texId, contentSize); // シーンテクスチャ表示
@@ -1132,12 +1141,13 @@ void App::OnUpdate()
 	ImVec2 windowPos = ImGui::GetWindowPos();
 	ImVec2 windowSize = ImGui::GetWindowSize();
 	float sceneTitleBarHeight = ImGui::GetFrameHeight();
-	ImGui::SetCursorPos(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight())); // Image 内の座標
-	if (ImGui::Button("Translate")) gizmoOperation_ = ImGuizmo::TRANSLATE;
-	ImGui::SameLine();
-	if (ImGui::Button("Rotate"))    gizmoOperation_ = ImGuizmo::ROTATE;
-	ImGui::SameLine();
-	if (ImGui::Button("Scale"))     gizmoOperation_ = ImGuizmo::SCALE;
+	ImGui::SetCursorPos(ImVec2(0, 30)); // Image 内の座標
+	ImTextureID translateIconTexId = (ImTextureID)((VkDescriptorSet)potisionIconDescSet_->GetDescriptorSet());
+	if (ImGui::ImageButton("Translate", translateIconTexId, ImVec2(32, 32))) gizmoOperation_ = ImGuizmo::TRANSLATE;
+	ImTextureID rotationIconTexId = (ImTextureID)((VkDescriptorSet)rotationIconDescSet_->GetDescriptorSet());
+	if (ImGui::ImageButton("Rotate", rotationIconTexId, ImVec2(32, 32)))    gizmoOperation_ = ImGuizmo::ROTATE;
+	ImTextureID scaleIconTexId = (ImTextureID)((VkDescriptorSet)scaleIconDescSet_->GetDescriptorSet());
+	if (ImGui::ImageButton("Scale", scaleIconTexId, ImVec2(32, 32)))     gizmoOperation_ = ImGuizmo::SCALE;
 
 	glm::mat4 view = camera_.GetView();
 	glm::mat4 proj = camera_.GetProj();
@@ -1146,13 +1156,13 @@ void App::OnUpdate()
 	ImGuizmo::SetRect(windowPos.x, windowPos.y, windowSize.x, windowSize.y);
 	//ImGuizmo::DrawGrid(glm::value_ptr(view), glm::value_ptr(proj), glm::value_ptr(indentityMatrix), 100.f);
 	ImGui::End();
-	ImGuizmo::ViewManipulate(glm::value_ptr(view), 1.0f, ImVec2(sceneWidth_ / 6.0f * 5, sceneTitleBarHeight), ImVec2(sceneWidth_ / 6.0f, sceneHeight_ / 6.0f), 0x10101010);
+	ImGuizmo::ViewManipulate(glm::value_ptr(view), 1.0f, ImVec2(sceneViewSize_.width / 6.0f * 5, sceneTitleBarHeight), ImVec2(sceneViewSize_.width / 6.0f, sceneViewSize_.height / 6.0f), 0x10101010);
 
 	glm::quat qCamera = glm::quat_cast(glm::transpose(glm::mat3(view)));
 	// Using ImGui::GetWindowWidth() returns default value, (400, 400), when no resize
-	//ImVec2 gizmoPos = ImVec2(ImGui::GetWindowPos().x + sceneWidth_ - sceneWidth_ / 6.0f, ImGui::GetWindowPos().y);
-	ImVec2 gizmoPos = ImVec2(sceneWidth_ - sceneWidth_ / 6.0f, 0.0f);
-	ImVec2 gizmoSize = ImVec2(sceneWidth_ / 6.0f, sceneHeight_ / 6.0f);
+	//ImVec2 gizmoPos = ImVec2(ImGui::GetWindowPos().x + sceneViewSize_.width - sceneViewSize_.width / 6.0f, ImGui::GetWindowPos().y);
+	ImVec2 gizmoPos = ImVec2(sceneViewSize_.width - sceneViewSize_.width / 6.0f, 0.0f);
+	ImVec2 gizmoSize = ImVec2(sceneViewSize_.width / 6.0f, sceneViewSize_.height / 6.0f);
 	bool isMouseOverViewCube =
 		(mouse.x >= gizmoPos.x && mouse.x <= gizmoPos.x + gizmoSize.x) &&
 		(mouse.y >= gizmoPos.y && mouse.y <= gizmoPos.y + gizmoSize.y);
@@ -1200,8 +1210,8 @@ void App::OnUpdate()
 	{
 		panelWindowFlag &= ~ImGuiWindowFlags_NoResize;
 	}
-	ImGui::SetNextWindowPos(ImVec2(sceneWidth_, 0));
-	ImGui::SetNextWindowSize(ImVec2(panelWidth_, windowHeight_));
+	ImGui::SetNextWindowPos(ImVec2(sceneViewSize_.width, 0));
+	ImGui::SetNextWindowSize(ImVec2(inspectorViewSize_.width, windowHeight_));
 	ImGui::Begin("Inspector", nullptr, panelWindowFlag);
 	size = ImGui::GetWindowSize();
 	if (ImGui::IsWindowHovered()) {
@@ -1225,15 +1235,16 @@ void App::OnUpdate()
 	else {
 		catchPanelDir_ = GuiDir::None;
 	}
-	changedPanelWidth_ = size.x;
-	changedPanelHeight_ = size.y;
+	inspectorViewSize_.changedWidth = size.x;
+	inspectorViewSize_.changedHeight = size.y;
 	if (ImGui::CollapsingHeader("Rendering", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		// 子ウィンドウ開始：縦方向に自動リサイズしたい
 		ImGui::BeginChild("Rendering", ImVec2(0, 0), ImGuiChildFlags_AlwaysAutoResize | ImGuiChildFlags_AutoResizeY);
 
-		if (ImGui::Selectable("Forward", renderMode_ == 0)) renderMode_ = 0;
-		if (ImGui::Selectable("Differed", renderMode_ == 1))    renderMode_ = 1;
+		if (ImGui::Selectable("Forward", renderMode_ == 0, 0, ImVec2(inspectorViewSize_.changedWidth / 3, 0))) renderMode_ = 0;
+		ImGui::SameLine();
+		if (ImGui::Selectable("Differed", renderMode_ == 1, 0, ImVec2(inspectorViewSize_.changedWidth / 3, 0)))    renderMode_ = 1;
 
 		ImGui::EndChild();
 	}
@@ -1306,8 +1317,8 @@ void App::OnUpdate()
 	{
 		filePanelWindowFlag &= ~ImGuiWindowFlags_NoResize;
 	}
-	ImGui::SetNextWindowPos(ImVec2(0, sceneHeight_));
-	ImGui::SetNextWindowSize(ImVec2(filePanelWidth_, filePanelHeight_));
+	ImGui::SetNextWindowPos(ImVec2(0, sceneViewSize_.height));
+	ImGui::SetNextWindowSize(ImVec2(filePanelSize_.width, filePanelSize_.height));
 	ImGui::Begin("Loaded Data", nullptr, filePanelWindowFlag);
 	size = ImGui::GetWindowSize();
 	if (ImGui::IsWindowHovered()) {
@@ -1332,8 +1343,8 @@ void App::OnUpdate()
 	else {
 		catchFilePanelDir_ = GuiDir::None;
 	}
-	changedFilePanelWidth_ = size.x;
-	changedFilePanelHeight_ = size.y;
+	filePanelSize_.changedWidth = size.x;
+	filePanelSize_.changedHeight = size.y;
 	ImGui::Columns(2, nullptr, false);
 	if (ImGui::CollapsingHeader("Model", ImGuiTreeNodeFlags_DefaultOpen))
 	{
@@ -1425,18 +1436,18 @@ void App::OnResize(unsigned int width, unsigned int height)
 	windowWidth_ = width;
 	windowHeight_ = height;
 
-	sceneWidth_ = windowWidth_ * sceneViewScaleX_;
-	sceneHeight_ = windowHeight_ * sceneViewScaleY_;
-	changedSceneWidth_ = sceneWidth_;
-	changedSceneHeight_ = sceneHeight_;
-	panelWidth_ = windowWidth_ * (1.0f - sceneViewScaleX_);
-	panelHeight_ = windowHeight_;
-	changedPanelWidth_ = panelWidth_;
-	changedPanelHeight_ = panelHeight_;
-	filePanelWidth_ = windowWidth_ * sceneViewScaleX_;
-	filePanelHeight_ = windowHeight_ * (1.0f - sceneViewScaleY_);
-	changedFilePanelWidth_ = filePanelWidth_;
-	changedFilePanelHeight_ = filePanelHeight_;
+	sceneViewSize_.width = windowWidth_ * sceneViewScaleX_;
+	sceneViewSize_.height = windowHeight_ * sceneViewScaleY_;
+	sceneViewSize_.changedWidth = sceneViewSize_.width;
+	sceneViewSize_.changedHeight = sceneViewSize_.height;
+	inspectorViewSize_.width = windowWidth_ * (1.0f - sceneViewScaleX_);
+	inspectorViewSize_.height = windowHeight_;
+	inspectorViewSize_.changedWidth = inspectorViewSize_.width;
+	inspectorViewSize_.changedHeight = inspectorViewSize_.height;
+	filePanelSize_.width = windowWidth_ * sceneViewScaleX_;
+	filePanelSize_.height = windowHeight_ * (1.0f - sceneViewScaleY_);
+	filePanelSize_.changedWidth = filePanelSize_.width;
+	filePanelSize_.changedHeight = filePanelSize_.height;
 
 	Recreate();
 }
