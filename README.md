@@ -1,3 +1,3 @@
 # tatter-renderer
 
-![teather](Assets/teather.png)
+![teather](asset/teather.png)
