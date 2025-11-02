@@ -1,3 +1,7 @@
-- Componentでmodeldata, transformをアタッチできるようにする
 - Android対応
-- Forward passの実装
+- Camera は roll z軸中心回転しないようにしている
+	- ViewManipulateが非対応っぽい
+	- CameraのGetViewでupを常に(0,1,0)にしているのもある
+	- quaternionで管理しているがうまく動作していない
+- モデルを消したときモデルのインスタンス数のカウントがずれる
+	- いったん消してもdecreamentしないようにして対応

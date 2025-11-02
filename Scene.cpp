@@ -51,7 +51,7 @@ ObjectData::ObjectData(
 
 ObjectData::~ObjectData()
 {
-	model_->DecrementInstance();
+	//model_->DecrementInstance();
 }
 
 std::string ObjectData::GetName() const

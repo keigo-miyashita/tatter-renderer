@@ -75,6 +75,9 @@ Material::Material(const sqrp::Device& device, std::string modelDir, std::string
         //m.alphaCutoff = static_cast<float>(mat.alphaCutoff);
 
         //outMaterials.push_back(m);
+		doubleSided_ = mat.doubleSided;
+		alphaMode_ = mat.alphaMode;
+		alphaCutoff_ = static_cast<float>(mat.alphaCutoff);
     }
 }
 

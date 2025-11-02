@@ -16,11 +16,6 @@ layout(std140, set = 0, binding = 0) uniform CameraDetail
 layout(set = 0, binding = 1) uniform samplerCube cubeEnvMap;  // HDR input
 
 #ifdef GL_VERTEX_SHADER
-layout(location = 0) in vec4 vPosition;
-layout(location = 1) in vec4 vNormal;
-layout(location = 2) in vec4 vTangent;
-layout(location = 3) in vec2 vUV;
-
 layout(location = 0) out vec4 ndc;
 
 void main()

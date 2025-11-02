@@ -36,9 +36,9 @@ private:
     sqrp::ImageHandle emissiveTexture_;
 
     // ï`âÊê›íË
-    bool doubleSided = false;
-    std::string alphaMode = "OPAQUE";
-    float alphaCutoff = 0.5f;
+    bool doubleSided_ = false;
+    std::string alphaMode_ = "OPAQUE";
+    float alphaCutoff_ = 0.5f;
 
 public:
     Material(const sqrp::Device& device, std::string modelDir, std::string modelName);
