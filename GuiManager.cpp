@@ -161,39 +161,7 @@ GuiManager::GuiManager(App* app)
 
 void GuiManager::DrawGui()
 {
-	/*isChangedSceneSize_ = false;
-	if (sceneViewSize_.changedWidth != sceneViewSize_.width) {
-		sceneViewSize_.width = sceneViewSize_.changedWidth;
-		inspectorViewSize_.width = app_->windowWidth_ - sceneViewSize_.width;
-		filePanelSize_.width = sceneViewSize_.width;
-		isChangedSceneSize_ = true;
-	}
-	if (sceneViewSize_.changedHeight != sceneViewSize_.height) {
-		sceneViewSize_.height = sceneViewSize_.changedHeight;
-		filePanelSize_.height = app_->windowHeight_ - sceneViewSize_.height;
-		isChangedSceneSize_ = true;
-	}
-	if (inspectorViewSize_.changedWidth != inspectorViewSize_.width) {
-		inspectorViewSize_.width = inspectorViewSize_.changedWidth;
-		sceneViewSize_.width = app_->windowWidth_ - inspectorViewSize_.width;
-		filePanelSize_.width = sceneViewSize_.width;
-		filePanelSize_.height = app_->windowHeight_ - sceneViewSize_.height;
-		isChangedSceneSize_ = true;
-	}
-	if (filePanelSize_.changedHeight != filePanelSize_.height) {
-		filePanelSize_.height = filePanelSize_.changedHeight;
-		sceneViewSize_.height = app_->windowHeight_ - filePanelSize_.height;
-		sceneViewSize_.width = filePanelSize_.width;
-		inspectorViewSize_.width = app_->windowWidth_ - sceneViewSize_.width;
-		isChangedSceneSize_ = true;
-	}
-	if (filePanelSize_.changedWidth != filePanelSize_.width) {
-		filePanelSize_.width = filePanelSize_.changedWidth;
-		sceneViewSize_.width = filePanelSize_.width;
-		inspectorViewSize_.width = app_->windowWidth_ - sceneViewSize_.width;
-		isChangedSceneSize_ = true;
-	}*/
-
+	isNeedRecreate_ = false;
 	gui_->NewFrame();
 
 	ImGuiIO& io = ImGui::GetIO();
@@ -203,35 +171,10 @@ void GuiManager::DrawGui()
 	ImVec2 mouse = ImGui::GetIO().MousePos;
 
 	// 1. Scene View
-	ImGuiWindowFlags sceneWindowFlag = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoTitleBar;
-	/*if (catchSceneDir_ & GuiDir::Left || catchSceneDir_ & GuiDir::Up || catchSceneDir_ & (GuiDir::Down | GuiDir::Left) || catchSceneDir_ & (GuiDir::Down | GuiDir::Right))
-	{
-		sceneWindowFlag |= ImGuiWindowFlags_NoResize;
-	}*/
-	/*if (catchSceneDir_ & GuiDir::Right) {
-		cout << "Catch scene right." << endl;
-	}*/
+	ImGuiWindowFlags sceneWindowFlag = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoTitleBar & (~ImGuiWindowFlags_NoResize);
 	if (catchedSceneEdge_ & (GuiEdge::Left | GuiEdge::Up) || (catchedSceneEdge_ & (GuiEdge::Down | GuiEdge::Right)) == (GuiEdge::Down | GuiEdge::Right))
 	{
-		if (catchedSceneEdge_ & GuiEdge::Left)
-		{
-			cout << "Catch scene left." << endl;
-		}
-		if (catchedSceneEdge_ & GuiEdge::Right) {
-			cout << "Catch scene right." << endl;
-		}
-		if (catchedSceneEdge_ & GuiEdge::Up) {
-			cout << "Catch scene up." << endl;
-		}
-		if (catchedSceneEdge_ & GuiEdge::Down) {
-			cout << "Catch scene down." << endl;
-		}
 		sceneWindowFlag |= ImGuiWindowFlags_NoResize;
-		cout << "Scene No Resize." << endl;
-	}
-	else
-	{
-		sceneWindowFlag &= ~ImGuiWindowFlags_NoResize;
 	}
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -257,59 +200,20 @@ void GuiManager::DrawGui()
 	}
 	sceneViewSize_.changedWidth = size.x;
 	sceneViewSize_.changedHeight = size.y;
-	cout << "sceneVIewSize_.width: " << sceneViewSize_.width << ", sceneViewSize_.height: " << sceneViewSize_.height << endl;
-	cout << "sceneViewSize_.changedWidth: " << sceneViewSize_.changedWidth << ", sceneViewSize_.changedHeight: " << sceneViewSize_.changedHeight << endl;
-	if (sceneViewSize_.width != sceneViewSize_.changedWidth || sceneViewSize_.height != sceneViewSize_.changedHeight) {
-		//for (int testi = 0; testi < 20; testi++) {
-			cout << "        Scene View Size: " << sceneViewSize_.width << ", " << sceneViewSize_.height << endl;
-			cout << "Changed Scene View Size: " << sceneViewSize_.changedWidth << ", " << sceneViewSize_.changedHeight << endl;
-		//}
-	}
 	
+	// Scene Image
 	ImVec2 contentSize = ImGui::GetContentRegionAvail();
 	ImTextureID texId = (ImTextureID)((VkDescriptorSet)guiDescriptorSets_[app_->swapchain_->GetCurrentInflightIndex()]->GetDescriptorSet());
-	ImGui::Image(texId, contentSize); // Draw scene image
+	ImGui::Image(texId, contentSize);
 
+	// File Open Button
 	ImGui::SetCursorPos(ImVec2(0, 0));
-	std::string selectedFile = "";
+	isOpenFile_ = false;
 	if (ImGui::Button("File")) {
-		// auto-freeing memory
-		NFD::UniquePath outPath;
-
-		// prepare filters for the dialog
-		nfdfilteritem_t filterItem[2] = { {"glTF file", "gltf"}, {"hdr file", "hdr"} };
-
-		// show the dialog
-		nfdresult_t result = NFD::OpenDialog(outPath, filterItem, 2);
-		if (result == NFD_OKAY) {
-			std::cout << "Success!" << std::endl << outPath.get() << std::endl;
-			std::string filePath = outPath.get();
-			if (filePath.ends_with(".gltf") || filePath.ends_with(".GLTF")) {
-				std::filesystem::path pathObj(filePath);
-				newModelPath_ = pathObj.filename().string();
-				isNeedReloadModel_ = true;
-			}
-			else if (filePath.ends_with(".hdr") || filePath.ends_with(".HDR")) {
-				// HDR テクスチャ読み込み処理
-				// 例: stb_image などで読み込む
-				std::filesystem::path pathObj(filePath);
-				newEnvMapPath_ = pathObj.filename().string();
-				isNeedReloadEnvMap_ = true;
-			}
-		}
-		else if (result == NFD_CANCEL) {
-			std::cout << "User pressed cancel." << std::endl;
-		}
-		else {
-			std::cout << "Error: " << NFD::GetError() << std::endl;
-		}
-	}
-	else {
-		isNeedReloadModel_ = false;
-		isNeedReloadEnvMap_ = false;
+		isOpenFile_ = true;
 	}
 	
-	// Draw icons
+	// Icons
 	ImGui::SetCursorPos(ImVec2(0, 30)); // Image 内の座標
 	ImTextureID translateIconTexId = (ImTextureID)((VkDescriptorSet)translateIconDescSet_->GetDescriptorSet());
 	if (ImGui::ImageButton("Translate", translateIconTexId, ImVec2(32, 32))) gizmoOperation_ = ImGuizmo::TRANSLATE;
@@ -318,6 +222,7 @@ void GuiManager::DrawGui()
 	ImTextureID scaleIconTexId = (ImTextureID)((VkDescriptorSet)scaleIconDescSet_->GetDescriptorSet());
 	if (ImGui::ImageButton("Scale", scaleIconTexId, ImVec2(32, 32)))     gizmoOperation_ = ImGuizmo::SCALE;
 
+	// View Manipulate
 	ImVec2 sceneWindowSize = ImGui::GetWindowSize();
 	ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
 	ImGuizmo::SetRect(sceneWindowPos.x, sceneWindowPos.y, sceneWindowSize.x, sceneWindowSize.y);
@@ -361,19 +266,10 @@ void GuiManager::DrawGui()
 	ImGui::PopStyleVar();
 
 	// 2. Inspector view
-	ImGuiWindowFlags inspectorWindowFlag = ImGuiWindowFlags_NoCollapse;
-	/*if ((catchPanelDir_ & GuiDir::Right) || (catchPanelDir_ & GuiDir::Up) || (catchPanelDir_ & GuiDir::Down))
-	{
-		panelWindowFlag |= ImGuiWindowFlags_NoResize;
-	}*/
+	ImGuiWindowFlags inspectorWindowFlag = ImGuiWindowFlags_NoCollapse & (~ImGuiWindowFlags_NoResize);
 	if (catchedInspectorDir_ & (GuiEdge::Right | GuiEdge::Up | GuiEdge::Down))
 	{
 		inspectorWindowFlag |= ImGuiWindowFlags_NoResize;
-		cout << "Panel No Resize." << endl;
-	}
-	else
-	{
-		inspectorWindowFlag &= ~ImGuiWindowFlags_NoResize;
 	}
 	ImGui::SetNextWindowPos(ImVec2(sceneViewSize_.width, 0));
 	ImGui::SetNextWindowSize(ImVec2(inspectorViewSize_.width, app_->windowHeight_));
@@ -399,12 +295,6 @@ void GuiManager::DrawGui()
 	}
 	inspectorViewSize_.changedWidth = size.x;
 	inspectorViewSize_.changedHeight = size.y;
-	if (inspectorViewSize_.width != inspectorViewSize_.changedWidth || inspectorViewSize_.height != inspectorViewSize_.changedHeight) {
-		//for (int testi = 0; testi < 20; testi++) {
-			cout << "        Inspector View Size: " << inspectorViewSize_.width << ", " << inspectorViewSize_.height << endl;
-			cout << "Changed Inspector View Size: " << inspectorViewSize_.changedWidth << ", " << inspectorViewSize_.changedHeight << endl;
-		//}
-	}
 
 	glm::vec3 position = glm::vec3(0.0f);
 	glm::vec3 displayRotation = glm::vec3(0.0f);
@@ -477,7 +367,6 @@ void GuiManager::DrawGui()
 				//// 回転順序を定義（重要）
 				glm::quat q = qYaw * qPitch * qRoll; // Yaw→Pitch→Roll の順
 				app_->camera_.SetRotation(q);
-				//app_->camera_.SetRotation(glm::quat(glm::radians(normalizedRotation)));
 			}
 		}
 		ImGui::EndChild();
@@ -486,10 +375,13 @@ void GuiManager::DrawGui()
 	{
 		ImGui::BeginChild("ObjectChild", ImVec2(0, 0), ImGuiChildFlags_AlwaysAutoResize | ImGuiChildFlags_AutoResizeY);
 		std::vector<const char*> itemPtrs;
-		for (const auto& objectName : app_->objectNames_)
-			itemPtrs.push_back(objectName.c_str());
+		for (int i = 0; i < app_->objectNames_.size(); i++) {
+			if (app_->objectNames_[i] == selectedObjectName_) {
+				selectedObjectIndex_ = i;
+			}
+			itemPtrs.push_back(app_->objectNames_[i].c_str());
+		}
 		if (app_->objectNames_.size() == 0) {
-			selectedObjectIndex_ = -1;
 			selectedObjectName_ = "";
 		}
 		if (ImGui::Combo("Select Model", &selectedObjectIndex_, itemPtrs.data(), static_cast<int>(itemPtrs.size())))
@@ -526,13 +418,11 @@ void GuiManager::DrawGui()
 				app_->objectData_.at(selectedObjectName_)->SetScale(scale);
 			}
 		}
+		deletedModelName_ = "";
 		if (ImGui::Button("Delete")) {
 			cout << "Delete Model: " << selectedObjectName_ << endl;
 			deletedModelName_ = selectedObjectName_;
-		}
-		else {
-			isNeedRecreate_ = false;
-			deletedModelName_ = "";
+			isNeedRecreate_ = true;
 		}
 
 		ImGui::EndChild();
@@ -544,37 +434,27 @@ void GuiManager::DrawGui()
 		for (const auto& envMapName : app_->envMapNames_)
 			itemPtrs.push_back(envMapName.c_str());
 		int beforeEnvMapIndex = selectedEnvMapIndex_;
+		isChangedEnvMap_ = false;
 		if (ImGui::Combo("Select EnvMap", &selectedEnvMapIndex_, itemPtrs.data(), static_cast<int>(itemPtrs.size())))
 		{
 			if (beforeEnvMapIndex != selectedEnvMapIndex_) {
 				isChangedEnvMap_ = true;
+				isNeedRecreate_ = true;
 			}
-			else {
-				isChangedEnvMap_ = false;
-			}
+			selectedEnvMapName_ = "";
 			if (app_->envMapNames_.size() != 0) {
 				selectedEnvMapName_ = app_->envMapNames_[selectedEnvMapIndex_];
-			}
-			else {
-				selectedEnvMapIndex_ = -1;
-				selectedEnvMapName_ = "";
 			}
 		}
 		ImGui::EndChild();
 	}
 	ImGui::End();
 
-	// Asset view 
-	ImGuiWindowFlags assetWindowFlag = ImGuiWindowFlags_NoCollapse;
+	// 3. Asset view 
+	ImGuiWindowFlags assetWindowFlag = ImGuiWindowFlags_NoCollapse & (~ImGuiWindowFlags_NoResize);
 	if (catchedAssetDir_ & (GuiEdge::Left | GuiEdge::Down))
 	{
-		cout << "No Resizing File Panel" << endl;
 		assetWindowFlag |= ImGuiWindowFlags_NoResize;
-		cout << "File Panel No Resize." << endl;
-	}
-	else
-	{
-		assetWindowFlag &= ~ImGuiWindowFlags_NoResize;
 	}
 	ImGui::SetNextWindowPos(ImVec2(0, sceneViewSize_.height));
 	ImGui::SetNextWindowSize(ImVec2(assetViewSize_.width, assetViewSize_.height));
@@ -601,29 +481,22 @@ void GuiManager::DrawGui()
 	size = ImGui::GetWindowSize();
 	assetViewSize_.changedWidth = size.x;
 	assetViewSize_.changedHeight = size.y;
-	if (assetViewSize_.width != assetViewSize_.changedWidth || assetViewSize_.height != assetViewSize_.changedHeight) {
-		//for (int testi = 0; testi < 20; testi++) {
-			cout << "        Asset View Size: " << assetViewSize_.width << ", " << assetViewSize_.height << endl;
-			cout << "Changed Asset View Size: " << assetViewSize_.changedWidth << ", " << assetViewSize_.changedHeight << endl;
-		//}
-	}
 	ImGui::Columns(2, nullptr, false);
 	if (ImGui::CollapsingHeader("Model", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		ImGui::BeginChild("ModelChild", ImVec2(size.x / 2, 0), ImGuiChildFlags_AlwaysAutoResize | ImGuiChildFlags_AutoResizeY);
 
-		isNeedRecreate_ = false;
 		addedModelName_ = "";
 		for (const auto& [modelName, modelData] : app_->models_) {
 			ImGui::Text(modelName.c_str());
 			ImGui::SameLine();
 			ImVec2 childWindowSize = ImGui::GetWindowSize();
 			ImGui::SetCursorPosX(childWindowSize.x - 50);
-			//cout << "modelName: " << modelName << endl;
 			if (ImGui::Button(("Add##" + modelName).c_str()))
 			{
 				cout << "Add Model: " << modelName << endl;
 				addedModelName_ = modelName;
+				isNeedRecreate_ = true;
 			}
 		}
 
@@ -641,35 +514,34 @@ void GuiManager::DrawGui()
 	}
 	ImGui::End();
 
-	isChangedSceneSize_ = false;
 	if (sceneViewSize_.changedWidth != sceneViewSize_.width) {
 		sceneViewSize_.width = sceneViewSize_.changedWidth;
 		inspectorViewSize_.width = app_->windowWidth_ - sceneViewSize_.width;
 		assetViewSize_.width = sceneViewSize_.width;
-		isChangedSceneSize_ = true;
+		isNeedRecreate_ = true;
 	}
 	else if (sceneViewSize_.changedHeight != sceneViewSize_.height) {
 		sceneViewSize_.height = sceneViewSize_.changedHeight;
 		assetViewSize_.height = app_->windowHeight_ - sceneViewSize_.height;
-		isChangedSceneSize_ = true;
+		isNeedRecreate_ = true;
 	}
 	else if (inspectorViewSize_.changedWidth != inspectorViewSize_.width) {
 		inspectorViewSize_.width = inspectorViewSize_.changedWidth;
 		sceneViewSize_.width = app_->windowWidth_ - inspectorViewSize_.width;
 		assetViewSize_.width = sceneViewSize_.width;
-		isChangedSceneSize_ = true;
+		isNeedRecreate_ = true;
 	}
 	else if (assetViewSize_.changedHeight != assetViewSize_.height) {
 		assetViewSize_.height = assetViewSize_.changedHeight;
 		sceneViewSize_.height = app_->windowHeight_ - assetViewSize_.height;
 		sceneViewSize_.width = assetViewSize_.width;
-		isChangedSceneSize_ = true;
+		isNeedRecreate_ = true;
 	}
 	else if (assetViewSize_.changedWidth != assetViewSize_.width) {
 		assetViewSize_.width = assetViewSize_.changedWidth;
 		sceneViewSize_.width = assetViewSize_.width;
 		inspectorViewSize_.width = app_->windowWidth_ - sceneViewSize_.width;
-		isChangedSceneSize_ = true;
+		isNeedRecreate_ = true;
 	}
 }
 
@@ -721,11 +593,6 @@ GuiWindowSize GuiManager::GetAssetViewSize()
 	return assetViewSize_;
 }
 
-int GuiManager::GetSelectedObjectIndex()
-{
-	return selectedObjectIndex_;
-}
-
 std::string GuiManager::GetSelectedObjectName()
 {
 	return selectedObjectName_;
@@ -736,24 +603,9 @@ std::string GuiManager::GetSelectedEnvMapName()
 	return selectedEnvMapName_;
 }
 
-bool GuiManager::IsChangedSceneSize()
-{
-	return isChangedSceneSize_;
-}
-
-bool GuiManager::IsNeedRecreate()
+bool GuiManager::GetIsNeedRecreate()
 {
 	return isNeedRecreate_;
-}
-
-bool GuiManager::IsNeedReloadModel()
-{
-	return isNeedReloadModel_;
-}
-
-bool GuiManager::IsNeedReloadEnvMap()
-{
-	return isNeedReloadEnvMap_;
 }
 
 int GuiManager::GetRenderMode()
@@ -776,19 +628,9 @@ bool GuiManager::IsChangedEnvMap()
 	return isChangedEnvMap_;
 }
 
-std::string GuiManager::GetNewModelPath()
+bool GuiManager::IsOpenFile()
 {
-	return newModelPath_;
-}
-
-std::string GuiManager::GetNewEnvMapPath()
-{
-	return newEnvMapPath_;
-}
-
-void GuiManager::SetSelectedObjectIndex(int index)
-{
-	selectedObjectIndex_ = index;
+	return isOpenFile_;
 }
 
 void GuiManager::SetSelectedObjectName(std::string name)
@@ -799,9 +641,4 @@ void GuiManager::SetSelectedObjectName(std::string name)
 void GuiManager::SetSelectedEnvMapName(std::string name)
 {
 	selectedEnvMapName_ = name;
-}
-
-void GuiManager::SetIsChangedEnvMap(bool isChanged)
-{
-	isChangedEnvMap_ = isChanged;
 }

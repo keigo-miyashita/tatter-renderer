@@ -58,44 +58,6 @@ sqrp::ImageHandle App::CreateIcon(std::string path)
 	return iconTexture;
 }
 
-void App::DefineGUIStyle()
-{
-	ImGuiStyle& style = ImGui::GetStyle();
-
-	// 全体の色を取得して変更
-	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.02f, 0.02f, 0.02f, 1.0f);   // ウィンドウ背景
-	// 通常のタイトルバー背景
-	style.Colors[ImGuiCol_TitleBg] = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); // 緑
-
-	// アクティブなウィンドウのタイトルバー背景
-	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); // 少し明るい緑
-	style.Colors[ImGuiCol_Header] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
-	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
-	style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
-
-	// ボタン
-	style.Colors[ImGuiCol_Button] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);        // 通常
-	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.3f, 0.5f, 0.7f, 1.0f); // ホバー
-	style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.1f, 0.3f, 0.5f, 1.0f);  // 押下中
-
-	// Selectable
-	style.Colors[ImGuiCol_Header] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);           // 通常
-	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.3f, 0.5f, 0.7f, 1.0f);    // ホバー
-	style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.1f, 0.3f, 0.5f, 1.0f);     // 選択中
-
-	// Checkbox (チェックボックス)
-	//style.Colors[ImGuiCol_CheckMark] = ImVec4(0.8f, 0.2f, 0.2f, 1.0f);       // チェックマークの色
-	style.Colors[ImGuiCol_FrameBg] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);         // 背景
-	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);  // ホバー
-	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);   // 押下中
-
-	// InputFloat3（入力欄）
-	style.Colors[ImGuiCol_FrameBg] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
-	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
-	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
-	//style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // テキスト色
-}
-
 void App::Recreate()
 {
 	device_.WaitIdle(QueueContextType::General);
@@ -819,25 +781,32 @@ void App::OnStart()
 
 void App::OnUpdate()
 {	
-	if (guiManager_->GetAddedModelName() != "") {
+	if (guiManager_->GetIsNeedRecreate()) {
 		device_.WaitIdle(QueueContextType::General);
-		std::shared_ptr<ObjectData> objData = std::make_shared<ObjectData>(
-			device_, models_.at(guiManager_->GetAddedModelName()),
-			glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
-			glm::quat(glm::vec3(0.0f, 0.0f, 0.0f)),
-			1.0f
-		);
-		objectData_.emplace(
-			objData->GetName(),
-			objData
-		);
-		cout << objData->GetPModelData()->GetNumInstance() << endl;
-		cout << objData->GetName() << endl;
-		objectNames_.push_back(objData->GetName());
-		cout << "Added Object: " << objData->GetName() << endl;
-		cout << "selectedObjectIndex_ = " << guiManager_->GetSelectedObjectIndex() << endl;
-		if (guiManager_->GetSelectedObjectIndex() == -1) {
-			guiManager_->SetSelectedObjectIndex(0);
+
+		if (guiManager_->GetDeletedModelName() != "") {
+			objectData_.erase(guiManager_->GetDeletedModelName());
+			for (int i = 0; i < objectNames_.size(); i++) {
+				if (objectNames_[i] == guiManager_->GetDeletedModelName()) {
+					objectNames_.erase(objectNames_.begin() + i);
+					break;
+				}
+			}
+			guiManager_->SetSelectedObjectName((objectNames_.size() != 0) ? objectNames_[0] : "");
+		}
+
+		if (guiManager_->GetAddedModelName() != "") {
+			std::shared_ptr<ObjectData> objData = std::make_shared<ObjectData>(
+				device_, models_.at(guiManager_->GetAddedModelName()),
+				glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
+				glm::quat(glm::vec3(0.0f, 0.0f, 0.0f)),
+				1.0f
+			);
+			objectData_.emplace(
+				objData->GetName(),
+				objData
+			);
+			objectNames_.push_back(objData->GetName());
 			guiManager_->SetSelectedObjectName(objData->GetName());
 		}
 
@@ -845,57 +814,51 @@ void App::OnUpdate()
 		guiManager_->Recreate();
 	}
 
-	if (guiManager_->GetDeletedModelName() != "") {
-		device_.WaitIdle(QueueContextType::General);
-		cout << "Deleted Object: " << guiManager_->GetDeletedModelName() << endl;
-		objectData_.erase(guiManager_->GetDeletedModelName());
-		for (int i = 0; i < objectNames_.size(); i++) {
-			if (objectNames_[i] == guiManager_->GetDeletedModelName()) {
-				objectNames_.erase(objectNames_.begin() + i);
-				break;
+	newModelPath_ = "";
+	newEnvMapPath_ = "";
+	if (guiManager_->IsOpenFile()) {
+		device_.WaitIdle(sqrp::QueueContextType::General);
+		// auto-freeing memory
+		NFD::UniquePath outPath;
+
+		// prepare filters for the dialog
+		nfdfilteritem_t filterItem[2] = { {"glTF file", "gltf"}, {"hdr file", "hdr"} };
+
+		// show the dialog
+		nfdresult_t result = NFD::OpenDialog(outPath, filterItem, 2);
+		if (result == NFD_OKAY) {
+			std::cout << "Success!" << std::endl << outPath.get() << std::endl;
+			std::string filePath = outPath.get();
+			if (filePath.ends_with(".gltf") || filePath.ends_with(".GLTF")) {
+				std::filesystem::path pathObj(filePath);
+				newModelPath_ = pathObj.filename().string();
+			}
+			else if (filePath.ends_with(".hdr") || filePath.ends_with(".HDR")) {
+				std::filesystem::path pathObj(filePath);
+				newEnvMapPath_ = pathObj.filename().string();
+			}
+			else if (result == NFD_CANCEL) {
+				std::cout << "User pressed cancel." << std::endl;
+			}
+			else {
+				std::cout << "Error: " << NFD::GetError() << std::endl;
 			}
 		}
-		if (objectNames_.size() == 0) {
-			guiManager_->SetSelectedObjectIndex(-1);
-			guiManager_->SetSelectedObjectName("");
+
+		if (newModelPath_ != "") {
+			GLTFMeshHandle mesh = device_.CreateGLTFMesh(string(MODEL_DIR) + newModelPath_);
+			MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR), newModelPath_);
+			models_.emplace(
+				mesh->GetName(),
+				std::make_shared<ModelData>(mesh, material)
+			);
 		}
-		else {
-			guiManager_->SetSelectedObjectIndex(0);
-			guiManager_->SetSelectedObjectName(objectNames_[0]);
+
+		if (newEnvMapPath_ != "") {
+			EnvironmentMapHandle envMap = std::make_shared<EnvironmentMap>(device_, string(HDR_DIR), newEnvMapPath_, envMapCompShader_, irradianceCompShader_, prefilterCompShader_, brdfLUTCompShader_);
+			envMaps_.insert({ envMap->GetName(), envMap });
+			envMapNames_.push_back(envMap->GetName());
 		}
-
-		Recreate();
-		guiManager_->Recreate();
-	}
-
-	if (guiManager_->IsChangedSceneSize() || guiManager_->IsNeedRecreate()) {
-
-		device_.WaitIdle(sqrp::QueueContextType::General);
-		Recreate();
-		guiManager_->Recreate();
-	}
-
-	if (guiManager_->IsNeedReloadModel()) {
-		device_.WaitIdle(sqrp::QueueContextType::General);
-		GLTFMeshHandle mesh = device_.CreateGLTFMesh(string(MODEL_DIR) + guiManager_->GetNewModelPath());
-		MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR), guiManager_->GetNewModelPath());
-		models_.emplace(
-			mesh->GetName(),
-			std::make_shared<ModelData>(mesh, material)
-		);
-	}
-
-	if (guiManager_->IsNeedReloadEnvMap()) {
-		device_.WaitIdle(sqrp::QueueContextType::General);
-		EnvironmentMapHandle envMap = std::make_shared<EnvironmentMap>(device_, string(HDR_DIR), guiManager_->GetNewEnvMapPath(), envMapCompShader_, irradianceCompShader_, prefilterCompShader_, brdfLUTCompShader_);
-		envMaps_.insert({ envMap->GetName(), envMap });
-		envMapNames_.push_back(envMap->GetName());
-	}
-
-	if (guiManager_->IsChangedEnvMap()) {
-		Recreate();
-		guiManager_->Recreate();
-		guiManager_->SetIsChangedEnvMap(false);
 	}
 
 	camera_.Update(guiManager_->GetSceneViewSize().width, guiManager_->GetSceneViewSize().height);

@@ -104,9 +104,12 @@ private:
 	sqrp::GraphicsPipelineHandle toneMapPipeline_;
 
 	GuiManagerHandle guiManager_;
+	
+	std::string newModelPath_ = "";
+	std::string newEnvMapPath_ = "";
 
 	sqrp::ImageHandle CreateIcon(std::string path);
-	void DefineGUIStyle();
+
 	void Recreate();
 
 public:

@@ -43,13 +43,9 @@ private:
 	float sceneViewScaleX_ = 0.8f;
 	float sceneViewScaleY_ = 0.7f;
 
-	bool isChangedSceneSize_ = false;
 	bool isNeedRecreate_ = false;
-	bool isNeedReloadModel_ = false;
-	bool isNeedReloadEnvMap_ = false;
 	bool isChangedEnvMap_ = false;
-	std::string newModelPath_ = "";
-	std::string newEnvMapPath_ = "";
+	bool isOpenFile_ = false;
 	std::string addedModelName_ = "";
 	std::string deletedModelName_ = "";
 	int selectedObjectIndex_ = 0;
@@ -85,24 +81,17 @@ public:
 	GuiWindowSize GetSceneViewSize();
 	GuiWindowSize GetInspectorViewSize();
 	GuiWindowSize GetAssetViewSize();
-	int GetSelectedObjectIndex();
 	std::string GetSelectedObjectName();
 	std::string GetSelectedEnvMapName();
-	bool IsChangedSceneSize();
-	bool IsNeedRecreate();
-	bool IsNeedReloadModel();
-	bool IsNeedReloadEnvMap();
+	bool GetIsNeedRecreate();
 	bool IsChangedEnvMap();
+	bool IsOpenFile();
 	int GetRenderMode();
-	std::string GetNewModelPath();
-	std::string GetNewEnvMapPath();
 	std::string GetAddedModelName();
 	std::string GetDeletedModelName();
 
-	void SetSelectedObjectIndex(int index);
 	void SetSelectedObjectName(std::string name);
 	void SetSelectedEnvMapName(std::string name);
-	void SetIsChangedEnvMap(bool isChanged);
 };
 
 using GuiManagerHandle = std::shared_ptr<GuiManager>;
