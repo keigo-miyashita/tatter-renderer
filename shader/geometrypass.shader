@@ -36,6 +36,11 @@ layout(push_constant) uniform Factors
 	float padding;
 	float metallic;
 	float roughness;
+	float padding1;
+	float padding2;
+	mat4 gltfModel;
+	mat4 gltfITModel;
+
 } factors;
 
 

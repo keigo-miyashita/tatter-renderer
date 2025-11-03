@@ -29,22 +29,6 @@ struct Light
 
 class GuiManager;
 
-//enum GuiDir : int
-//{
-//	None = 0x00000000,
-//	Left = 0x00000001,
-//	Right = 0x00000010,
-//	Up = 0x00000100,
-//	Down = 0x00001000
-//};
-//
-//struct GuiWindowSize {
-//	uint32_t width;
-//	uint32_t height;
-//	uint32_t changedWidth;
-//	uint32_t changedHeight;
-//};
-
 class App : public sqrp::Application
 {
 	friend class GuiManager;
@@ -105,11 +89,12 @@ private:
 	sqrp::ShaderHandle toneMapVertShader_;
 	sqrp::ShaderHandle toneMapPixelShader_;
 
-	std::unordered_map<std::string, std::vector<sqrp::DescriptorSetHandle>> forwardDescriptorSets_;
+	// string : Object name, vector : mesh index, vector : primitive index, vector : DescriptorSet per inflight
+	std::unordered_map<std::string, std::vector<std::vector<std::vector<sqrp::DescriptorSetHandle>>>> forwardDescriptorSets_;
 	sqrp::GraphicsPipelineHandle forwardPipeline_;
-	std::unordered_map<std::string, std::vector<sqrp::DescriptorSetHandle>> geomDescriptorSets_;
+	std::unordered_map<std::string, std::vector<std::vector<std::vector<sqrp::DescriptorSetHandle>>>> geomDescriptorSets_;
 	sqrp::GraphicsPipelineHandle geomPipeline_;
-	std::unordered_map<std::string, std::vector<sqrp::DescriptorSetHandle>> lightDescriptorSets_;
+	std::unordered_map<std::string, std::vector<std::vector<std::vector<sqrp::DescriptorSetHandle>>>> lightDescriptorSets_;
 	sqrp::GraphicsPipelineHandle lightPipeline_;
 
 	std::vector<sqrp::DescriptorSetHandle> skyboxDescriptorSets_;
@@ -119,58 +104,6 @@ private:
 	sqrp::GraphicsPipelineHandle toneMapPipeline_;
 
 	GuiManagerHandle guiManager_;
-
-	/*std::vector<sqrp::DescriptorSetHandle> guiDescriptorSets_;*/
-
-	//float sceneViewScaleX_ = 0.8f;
-	//float sceneViewScaleY_ = 0.7f;
-
-	//bool isNeedRecreate_ = false;
-	//bool isNeedReloadModel_ = false;
-	//bool isNeedReloadEnvMap_ = false;
-	//bool isChangedEnvMap_ = false;
-	//std::string newModelPath_ = "";
-	//std::string newEnvMapPath_ = "";
-	//int selectedObjectIndex_ = 0;
-	//std::string selectedObjectName_ = "";
-	//int selectedEnvMapIndex_ = 0;
-	//std::string selectedEnvMapName_ = "";
-	//bool isShowGuizmo_ = true;
-	//bool isModifiedRotation_ = false;
-	//int renderMode_ = 1; // 0: Forward, 1: G-Buffer
-	//ImGuizmo::OPERATION gizmoOperation_ = ImGuizmo::TRANSLATE;
-	//float edgeThreshold_ = 20.0f; // ÉäÉTÉCÉYñ≥å¯ïù
-	//std::array<int, 9> dir_ = { -1 /*None*/, 0/*Left*/, 1/*Right*/, 2/*Up*/, 3/*Down*/, 4/*UpLeft*/, 5/*UpRight*/, 6/*DownLeft*/, 7/*DownRight*/ };
-	//int catchSceneDir_ = -1;
-	//int catchPanelDir_ = -1;
-	//int catchFilePanelDir_ = -1;
-
-	//GuiWindowSize sceneViewSize_ = {
-	//	(uint32_t)(windowWidth_ * sceneViewScaleX_),
-	//	(uint32_t)(windowHeight_ * sceneViewScaleY_),
-	//	(uint32_t)(windowWidth_ * sceneViewScaleX_),
-	//	(uint32_t)(windowHeight_ * sceneViewScaleY_)
-	//};
-	//GuiWindowSize inspectorViewSize_ = {
-	//	(uint32_t)(windowWidth_ * (1.0f - sceneViewScaleX_)),
-	//	(uint32_t)(windowHeight_),
-	//	(uint32_t)(windowWidth_ * (1.0f - sceneViewScaleX_)),
-	//	(uint32_t)(windowHeight_)
-	//};
-	//GuiWindowSize filePanelSize_ = {
-	//	(uint32_t)(windowWidth_ * sceneViewScaleX_),
-	//	(uint32_t)(windowHeight_ * (1.0f - sceneViewScaleY_)),
-	//	(uint32_t)(windowWidth_ * sceneViewScaleX_),
-	//	(uint32_t)(windowHeight_ * (1.0f - sceneViewScaleY_))
-	//};
-	////uint32_t inspectorHeight_ = windowHeight_ * 0.1f;
-
-	//sqrp::ImageHandle potisionIconImage_;
-	//sqrp::DescriptorSetHandle potisionIconDescSet_;
-	//sqrp::ImageHandle rotationIconImage_;
-	//sqrp::DescriptorSetHandle rotationIconDescSet_;
-	//sqrp::ImageHandle scaleIconImage_;
-	//sqrp::DescriptorSetHandle scaleIconDescSet_;
 
 	sqrp::ImageHandle CreateIcon(std::string path);
 	void DefineGUIStyle();

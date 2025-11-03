@@ -5,7 +5,7 @@
 
 #include <nfd.hpp>
 
-enum GuiDir : int
+enum GuiEdge : int
 {
 	None = 0x00000000,
 	Left = 0x00000001,
@@ -62,13 +62,13 @@ private:
 	ImGuizmo::OPERATION gizmoOperation_ = ImGuizmo::TRANSLATE;
 	float edgeThreshold_ = 20.0f; // ÉäÉTÉCÉYñ≥å¯ïù
 	std::array<int, 9> dir_ = { -1 /*None*/, 0/*Left*/, 1/*Right*/, 2/*Up*/, 3/*Down*/, 4/*UpLeft*/, 5/*UpRight*/, 6/*DownLeft*/, 7/*DownRight*/ };
-	int catchSceneDir_ = -1;
-	int catchPanelDir_ = -1;
-	int catchFilePanelDir_ = -1;
+	int catchedSceneEdge_ = -1;
+	int catchedInspectorDir_ = -1;
+	int catchedAssetDir_ = -1;
 
 	GuiWindowSize sceneViewSize_;
 	GuiWindowSize inspectorViewSize_;
-	GuiWindowSize filePanelSize_;
+	GuiWindowSize assetViewSize_;
 
 	sqrp::ImageHandle CreateIcon(std::string path);
 	void DefineGUIStyle();
@@ -84,7 +84,7 @@ public:
 	sqrp::GUIHandle GetGui();
 	GuiWindowSize GetSceneViewSize();
 	GuiWindowSize GetInspectorViewSize();
-	GuiWindowSize GetFilePanelSize();
+	GuiWindowSize GetAssetViewSize();
 	int GetSelectedObjectIndex();
 	std::string GetSelectedObjectName();
 	std::string GetSelectedEnvMapName();

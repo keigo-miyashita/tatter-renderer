@@ -6,12 +6,12 @@ class ModelData
 {
 private:
 	int numInstance = 0;
-	sqrp::MeshHandle mesh_ = nullptr;
+	sqrp::GLTFMeshHandle mesh_ = nullptr;
 	MaterialHandle material_ = nullptr;
 
 public:
 	// NOTE ; To make sure default constructor is needed
-	ModelData(sqrp::MeshHandle mesh, MaterialHandle material);
+	ModelData(sqrp::GLTFMeshHandle mesh, MaterialHandle material);
 	ModelData(const ModelData&) = delete;
 	ModelData& operator=(const ModelData&) = delete;
 	ModelData(ModelData&&) noexcept = default; // ÉÄÅ[Éuãñâ¬
@@ -21,7 +21,7 @@ public:
 	void DecrementInstance();
 
 	int GetNumInstance() const;
-	sqrp::MeshHandle GetMesh();
+	sqrp::GLTFMeshHandle GetMesh();
 	MaterialHandle GetMaterial();
 };
 

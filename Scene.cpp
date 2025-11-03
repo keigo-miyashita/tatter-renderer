@@ -2,7 +2,7 @@
 
 using namespace std;
 
-ModelData::ModelData(sqrp::MeshHandle mesh, MaterialHandle material)
+ModelData::ModelData(sqrp::GLTFMeshHandle mesh, MaterialHandle material)
 	: mesh_(mesh), material_(material)
 {
 
@@ -23,7 +23,7 @@ int ModelData::GetNumInstance() const
 	return numInstance;
 }
 
-sqrp::MeshHandle ModelData::GetMesh()
+sqrp::GLTFMeshHandle ModelData::GetMesh()
 {
 	return mesh_;
 }
@@ -78,7 +78,11 @@ glm::mat4x4 ObjectData::GetModel()
 
 glm::mat4x4 ObjectData::GetInvTransModel()
 {
-	return glm::inverse(GetModel());
+	// NOTE : Shoud return mat3x3
+	glm::mat3x3 modelMat3x3 = glm::mat3x3(GetModel());
+	glm::mat4x4 invTransMat = glm::mat4x4(glm::inverse(glm::transpose(modelMat3x3)));
+	return invTransMat;
+	//return glm::inverse(GetModel());
 }
 
 sqrp::TransformMatrix ObjectData::GetTransform()

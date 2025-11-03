@@ -15,59 +15,69 @@ Material::Material(const sqrp::Device& device, std::string modelDir, std::string
 	}
 
     for (const auto& mat : model.materials) {
-        name_ = mat.name;
+        SubMaterialInfo subMaterialInfo = {};
+        subMaterialInfo.name = mat.name;
 
         // PBR Metallic-Roughness
         if (mat.pbrMetallicRoughness.baseColorFactor.size() == 4) {
             for (int i = 0; i < 4; i++) {
-                baseColorFactor_[i] = static_cast<float>(mat.pbrMetallicRoughness.baseColorFactor[i]);
+                subMaterialInfo.factors.baseColorFactor[i] = static_cast<float>(mat.pbrMetallicRoughness.baseColorFactor[i]);
             }
         }
         if (mat.pbrMetallicRoughness.baseColorTexture.index >= 0) {
 			int texIndex = mat.pbrMetallicRoughness.baseColorTexture.index;
-			baseColorTexture_ = LoadTexture(model, texIndex, 4, vk::Format::eR8G8B8A8Srgb);
+            subMaterialInfo.baseColorTexture = LoadTexture(model, texIndex, 4, vk::Format::eR8G8B8A8Srgb);
         }
 
         // PBR Metallic-Roughness
-        metallicFactor_ = static_cast<float>(mat.pbrMetallicRoughness.metallicFactor);
-        roughnessFactor_ = static_cast<float>(mat.pbrMetallicRoughness.roughnessFactor);
+        subMaterialInfo.factors.metallicFactor = static_cast<float>(mat.pbrMetallicRoughness.metallicFactor);
+        subMaterialInfo.factors.roughnessFactor = static_cast<float>(mat.pbrMetallicRoughness.roughnessFactor);
         if (mat.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0) {
             int texIndex = mat.pbrMetallicRoughness.metallicRoughnessTexture.index;
-			metallicRoughnessTexture_ = LoadTexture(model, texIndex, 4, vk::Format::eR8G8B8A8Unorm); // NOTE : GB channels are used for metallic and roughness
+            subMaterialInfo.metallicRoughnessTexture = LoadTexture(model, texIndex, 4, vk::Format::eR8G8B8A8Unorm); // NOTE : GB channels are used for metallic and roughness
         }
 
         if (mat.normalTexture.index >= 0)
         {
             int texIndex = mat.normalTexture.index;
-            normalTexture_ = LoadTexture(model, texIndex, 4, vk::Format::eR8G8B8A8Unorm); // NOTE : RGB channels are used for normal map
+            subMaterialInfo.normalTexture = LoadTexture(model, texIndex, 4, vk::Format::eR8G8B8A8Unorm); // NOTE : RGB channels are used for normal map
         }
 
         if (mat.occlusionTexture.index >= 0)
         {
             int texIndex = mat.occlusionTexture.index;
-            occlusionTexture_ = LoadTexture(model, texIndex, 1, vk::Format::eR8Unorm); // NOTE : Only R channel is used for occlusion
+            subMaterialInfo.occlusionTexture = LoadTexture(model, texIndex, 1, vk::Format::eR8Unorm); // NOTE : Only R channel is used for occlusion
+        }
+        else {
+			// NOTE : dummy
+            sqrp::ImageHandle texture = pDevice_->CreateImage(
+                "dummyAO",
+                vk::Extent3D{ static_cast<uint32_t>(1), static_cast<uint32_t>(1), 1 },
+                vk::ImageType::e2D,
+                vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                vk::Format::eR8Unorm,
+                vk::ImageLayout::eUndefined,
+                vk::ImageAspectFlagBits::eColor
+            );
+
+            pDevice_->OneTimeSubmit([&](sqrp::CommandBufferHandle pCommandBuffer) {
+                pCommandBuffer->TransitionLayout(texture, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+                pCommandBuffer->TransitionLayout(texture, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+                });
+            subMaterialInfo.occlusionTexture = texture; // NOTE : dummy
         }
 
         if (mat.emissiveFactor.size() == 3) {
             for (int i = 0; i < 3; i++)
             {
-                emissiveFactor_[i] = static_cast<float>(mat.emissiveFactor[i]);
+                subMaterialInfo.factors.emissiveFactor[i] = static_cast<float>(mat.emissiveFactor[i]);
             }
         }
         if (mat.emissiveTexture.index >= 0)
         {
             int texIndex = mat.emissiveTexture.index;
-			emissiveTexture_ = LoadTexture(model, texIndex, 4, vk::Format::eR8G8B8A8Srgb); // NOTE : RGB channels are used for emissive
+            subMaterialInfo.emissiveTexture = LoadTexture(model, texIndex, 4, vk::Format::eR8G8B8A8Srgb); // NOTE : RGB channels are used for emissive
         }
-
-        for (int i = 0; i < 4; i++) {
-            factors_.baseColorFactor[i] = baseColorFactor_[i];
-        }
-        for (int i = 0; i < 3; i++) {
-            factors_.emissiveFactor[i] = emissiveFactor_[i];
-		}
-		factors_.metallicFactor = metallicFactor_;
-		factors_.roughnessFactor = roughnessFactor_;
 
         //// ‚»‚Ì‘¼
         //m.doubleSided = mat.doubleSided;
@@ -75,9 +85,11 @@ Material::Material(const sqrp::Device& device, std::string modelDir, std::string
         //m.alphaCutoff = static_cast<float>(mat.alphaCutoff);
 
         //outMaterials.push_back(m);
-		doubleSided_ = mat.doubleSided;
-		alphaMode_ = mat.alphaMode;
-		alphaCutoff_ = static_cast<float>(mat.alphaCutoff);
+        subMaterialInfo.doubleSided = mat.doubleSided;
+        subMaterialInfo.alphaMode = mat.alphaMode;
+        subMaterialInfo.alphaCutoff = static_cast<float>(mat.alphaCutoff);
+
+		subMaterialInfos_.push_back(subMaterialInfo);
     }
 }
 
@@ -128,29 +140,29 @@ sqrp::ImageHandle Material::LoadTexture(const tinygltf::Model& model, int texInd
 	return texture;
 }
 
-sqrp::ImageHandle Material::GetBaseColorTexture() const
+sqrp::ImageHandle Material::GetBaseColorTexture(int materialIndex) const
 {
-    return baseColorTexture_;
+    return subMaterialInfos_[materialIndex].baseColorTexture;
 }
 
-sqrp::ImageHandle Material::GetMetallicRoughnessTexture() const
+sqrp::ImageHandle Material::GetMetallicRoughnessTexture(int materialIndex) const
 {
-    return metallicRoughnessTexture_;
+    return subMaterialInfos_[materialIndex].metallicRoughnessTexture;
 }
-sqrp::ImageHandle Material::GetNormalTexture() const
+sqrp::ImageHandle Material::GetNormalTexture(int materialIndex) const
 {
-    return normalTexture_;
+    return subMaterialInfos_[materialIndex].normalTexture;
 }
-sqrp::ImageHandle Material::GetOcclusionTexture() const
+sqrp::ImageHandle Material::GetOcclusionTexture(int materialIndex) const
 {
-    return occlusionTexture_;
+    return subMaterialInfos_[materialIndex].occlusionTexture;
 }
-sqrp::ImageHandle Material::GetEmissiveTexture() const
+sqrp::ImageHandle Material::GetEmissiveTexture(int materialIndex) const
 {
-    return emissiveTexture_;
+    return subMaterialInfos_[materialIndex].emissiveTexture;
 }
 
-Factors* Material::GetPFactors()
+Factors* Material::GetPFactors(int materialIndex)
 {
-	return &factors_;
+	return &(subMaterialInfos_[materialIndex].factors);
 }

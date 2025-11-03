@@ -13,9 +13,6 @@ sqrp::ImageHandle App::CreateIcon(std::string path)
 	}
 
 	std::vector<uint8_t> data(pixels, pixels + texWidth * texHeight * 4); // RGBA
-	/*for (int i = 0; i < texWidth * texHeight * 4; i++) {
-		data[i] = pixels[i] / 255.0f;
-	}*/
 	stbi_image_free(pixels);
 
 
@@ -140,7 +137,7 @@ void App::Recreate()
 
 	GuiWindowSize sceneViewSize = guiManager_->GetSceneViewSize();
 	GuiWindowSize inspectorViewSize = guiManager_->GetInspectorViewSize();
-	GuiWindowSize filePanelSize = guiManager_->GetFilePanelSize();
+	GuiWindowSize filePanelSize = guiManager_->GetAssetViewSize();
 	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
 		baseColorMetallnessImages_[i]->Recreate(sceneViewSize.width, sceneViewSize.height);
 		normalRoughnessImages_[i]->Recreate(sceneViewSize.width, sceneViewSize.height);
@@ -161,49 +158,65 @@ void App::Recreate()
 	forwardDescriptorSets_.clear();
 	geomDescriptorSets_.clear();
 	lightDescriptorSets_.clear();
-	for (auto& [name, objectData] : objectData_) {
-		forwardDescriptorSets_[name].resize(swapchain_->GetInflightCount());
-		geomDescriptorSets_[name].resize(swapchain_->GetInflightCount());
-		lightDescriptorSets_[name].resize(swapchain_->GetInflightCount());
-		for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
-			forwardDescriptorSets_[name][i] = device_.CreateDescriptorSet({
-				{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ objectData->GetPModelData()->GetMaterial()->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
-				}
-			);
-			geomDescriptorSets_[name][i] = device_.CreateDescriptorSet({
-				{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ objectData->GetPModelData()->GetMaterial()->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				}
-				);
+	for (const auto& [objectName, objectData] : objectData_) {
+		const auto& mesh = objectData->GetPModelData()->GetMesh();
+		int meshNum = mesh->GetMeshNum();
+		forwardDescriptorSets_[objectName].resize(meshNum);
+		geomDescriptorSets_[objectName].resize(meshNum);
+		lightDescriptorSets_[objectName].resize(meshNum);
+		for (const auto& subMeshinfo : mesh->GetSubMeshInfos()) {
+			sqrp::TransformMatrix mat = subMeshinfo.mat;
+			int meshID = subMeshinfo.meshIndex;
+			int primitiveNum = mesh->GetPrimitiveNumPerMesh(meshID);
+			forwardDescriptorSets_[objectName][meshID].resize(primitiveNum);
+			geomDescriptorSets_[objectName][meshID].resize(primitiveNum);
+			lightDescriptorSets_[objectName][meshID].resize(primitiveNum);
+			for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
+				int materialIndex = mesh->GetMaterialIndex(primitiveID);
+				forwardDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
+				geomDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
+				lightDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
+				for (int frameID = 0; frameID < swapchain_->GetInflightCount(); frameID++) {
+					forwardDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+						{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ objectData->GetPModelData()->GetMaterial()->GetBaseColorTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetMetallicRoughnessTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetNormalTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetOcclusionTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetEmissiveTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+						}
+					);
+					geomDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+						{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ objectData->GetPModelData()->GetMaterial()->GetBaseColorTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetMetallicRoughnessTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetNormalTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetOcclusionTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetEmissiveTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						}
+						);
 
-			lightDescriptorSets_[name][i] = device_.CreateDescriptorSet({
-				{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ depthImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+					lightDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+						{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ baseColorMetallnessImages_[frameID], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ normalRoughnessImages_[frameID], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ emissiveAOImages_[frameID], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ depthImages_[frameID], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+						}
+					);
 				}
-			);
+			}
 		}
 	}
 
@@ -232,7 +245,7 @@ void App::Recreate()
 	if (objectData_.size() != 0) {
 		forwardPipeline_ = device_.CreateGraphicsPipeline(
 			forwardRenderPass_, swapchain_, forwardVertShader_, forwardPixelShader_,
-			forwardDescriptorSets_.begin()->second[0],
+			forwardDescriptorSets_.begin()->second[0][0][0],
 			vk::PushConstantRange()
 			.setOffset(0)
 			.setSize(sizeof(Factors))
@@ -240,7 +253,7 @@ void App::Recreate()
 		);
 		geomPipeline_ = device_.CreateGraphicsPipeline(
 			geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_,
-			geomDescriptorSets_.begin()->second[0],
+			geomDescriptorSets_.begin()->second[0][0][0],
 			vk::PushConstantRange()
 			.setOffset(0)
 			.setSize(sizeof(Factors))
@@ -248,7 +261,7 @@ void App::Recreate()
 		);
 		lightPipeline_ = device_.CreateGraphicsPipeline(
 			lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_,
-			lightDescriptorSets_.begin()->second[0], {}, true, false
+			lightDescriptorSets_.begin()->second[0][0][0], {}, true, false
 		);
 	}
 
@@ -643,7 +656,7 @@ void App::OnStart()
 		{}
 	);
 
-	MeshHandle mesh = device_.CreateMesh(string(MODEL_DIR) + "DamagedHelmet.gltf");
+	GLTFMeshHandle mesh = device_.CreateGLTFMesh(string(MODEL_DIR) + "DamagedHelmet.gltf");
 	MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR), "DamagedHelmet.gltf");
 	models_.emplace(
 		mesh->GetName(),
@@ -651,32 +664,13 @@ void App::OnStart()
 	);
 
 
-	// Camera
 	camera_.Init((float)sceneViewWidth / (float)sceneViewHeight, glm::vec3(0.0f, 0.0f, 5.0f)); // Note sign
 
-	// Light
 	light0_.pos = glm::vec4(10.0f, 10.0f, 5.0f, 1.0f);
 	light0_.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	// Sphere0
-	//object_ = {};
-
 	cameraBuffer_ = device_.CreateBuffer(sizeof(CameraMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	cameraBuffer_->Write(CameraMatrix{ camera_.GetView(), camera_.GetProj() });
-
-	/*std::shared_ptr<ObjectData> objData = std::make_shared<ObjectData>(
-		device_, models_.at("DamagedHelmet"),
-		glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
-		glm::quat(glm::vec3(0.0f, 0.0f, 0.0f)),
-		1.0f
-	);
-	objectData_.emplace(
-		objData->GetName(),
-		objData
-	);
-	objectNames_.push_back(objData->GetName());*/
-	//selectedObjectName_ = objectNames_[0];
-	/*guiManager_->SetSelectedObjectName(objectNames_[0]);*/
 
 	lightBuffer_ = device_.CreateBuffer(sizeof(Light), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	lightBuffer_->Write(light0_);
@@ -711,49 +705,65 @@ void App::OnStart()
 	//guiManager_->SetSelectedObjectName(objectNames_[0]);
 	guiManager_->SetSelectedEnvMapName(envMapNames_[0]);
 
-	for (auto& [name, objectData] : objectData_) {
-		forwardDescriptorSets_[name].resize(swapchain_->GetInflightCount());
-		geomDescriptorSets_[name].resize(swapchain_->GetInflightCount());
-		lightDescriptorSets_[name].resize(swapchain_->GetInflightCount());
-		for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
-			forwardDescriptorSets_[name][i] = device_.CreateDescriptorSet({
-				{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ objectData->GetPModelData()->GetMaterial()->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
-				}
-			);
-			geomDescriptorSets_[name][i] = device_.CreateDescriptorSet({
-				{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ objectData->GetPModelData()->GetMaterial()->GetBaseColorTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetMetallicRoughnessTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetNormalTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetOcclusionTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ objectData->GetPModelData()->GetMaterial()->GetEmissiveTexture(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				}
-			);
+	for (const auto& [objectName, objectData] : objectData_) {
+		const auto& mesh = objectData->GetPModelData()->GetMesh();
+		int meshNum = mesh->GetMeshNum();
+		forwardDescriptorSets_[objectName].resize(meshNum);
+		geomDescriptorSets_[objectName].resize(meshNum);
+		lightDescriptorSets_[objectName].resize(meshNum);
+		for (const auto& subMeshinfo : mesh->GetSubMeshInfos()) {
+			sqrp::TransformMatrix mat = subMeshinfo.mat;
+			int meshID = subMeshinfo.meshIndex;
+			int primitiveNum = mesh->GetPrimitiveNumPerMesh(meshID);
+			forwardDescriptorSets_[objectName][meshID].resize(primitiveNum);
+			geomDescriptorSets_[objectName][meshID].resize(primitiveNum);
+			lightDescriptorSets_[objectName][meshID].resize(primitiveNum);
+			for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
+				int materialIndex = mesh->GetMaterialIndex(primitiveID);
+				forwardDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
+				geomDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
+				lightDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
+				for (int frameID = 0; frameID < swapchain_->GetInflightCount(); frameID++) {
+					forwardDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+						{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ objectData->GetPModelData()->GetMaterial()->GetBaseColorTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetMetallicRoughnessTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetNormalTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetOcclusionTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetEmissiveTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+						}
+					);
+					geomDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+						{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ objectData->GetPModelData()->GetMaterial()->GetBaseColorTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetMetallicRoughnessTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetNormalTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetOcclusionTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ objectData->GetPModelData()->GetMaterial()->GetEmissiveTexture(materialIndex), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						}
+						);
 
-			lightDescriptorSets_[name][i] = device_.CreateDescriptorSet({
-				{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ baseColorMetallnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ normalRoughnessImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ emissiveAOImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-				{ depthImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-				{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+					lightDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+						{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ baseColorMetallnessImages_[frameID], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ normalRoughnessImages_[frameID], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ emissiveAOImages_[frameID], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+						{ depthImages_[frameID], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetIrradianceMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetPrefilterMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+						}
+					);
 				}
-			);
+			}
 		}
 	}
 
@@ -776,7 +786,7 @@ void App::OnStart()
 	if (objectData_.size() != 0) {
 		forwardPipeline_ = device_.CreateGraphicsPipeline(
 			forwardRenderPass_, swapchain_, forwardVertShader_, forwardPixelShader_,
-			forwardDescriptorSets_.begin()->second[0],
+			forwardDescriptorSets_.begin()->second[0][0][0],
 			vk::PushConstantRange()
 			.setOffset(0)
 			.setSize(sizeof(Factors))
@@ -784,7 +794,7 @@ void App::OnStart()
 		);
 		geomPipeline_ = device_.CreateGraphicsPipeline(
 			geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_,
-			geomDescriptorSets_.begin()->second[0],
+			geomDescriptorSets_.begin()->second[0][0][0],
 			vk::PushConstantRange()
 			.setOffset(0)
 			.setSize(sizeof(Factors))
@@ -792,7 +802,7 @@ void App::OnStart()
 		);
 		lightPipeline_ = device_.CreateGraphicsPipeline(
 			lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_,
-			lightDescriptorSets_.begin()->second[0], {}, true, false
+			lightDescriptorSets_.begin()->second[0][0][0], {}, true, false
 		);
 	}
 
@@ -817,8 +827,6 @@ void App::OnUpdate()
 			glm::quat(glm::vec3(0.0f, 0.0f, 0.0f)),
 			1.0f
 		);
-		cout << "objData.GetModelData().GetNumInstance() = " << objData->GetPModelData()->GetNumInstance() << endl;
-		/*objectData_[objData.GetName()] = objData;*/
 		objectData_.emplace(
 			objData->GetName(),
 			objData
@@ -831,7 +839,6 @@ void App::OnUpdate()
 		if (guiManager_->GetSelectedObjectIndex() == -1) {
 			guiManager_->SetSelectedObjectIndex(0);
 			guiManager_->SetSelectedObjectName(objData->GetName());
-			//selectedObjectName_ = app_->objectNames_[selectedObjectIndex_];
 		}
 
 		Recreate();
@@ -840,8 +847,6 @@ void App::OnUpdate()
 
 	if (guiManager_->GetDeletedModelName() != "") {
 		device_.WaitIdle(QueueContextType::General);
-		/*cout << objData->GetPModelData()->GetNumInstance() << endl;
-		cout << objData->GetName() << endl;*/
 		cout << "Deleted Object: " << guiManager_->GetDeletedModelName() << endl;
 		objectData_.erase(guiManager_->GetDeletedModelName());
 		for (int i = 0; i < objectNames_.size(); i++) {
@@ -866,14 +871,13 @@ void App::OnUpdate()
 	if (guiManager_->IsChangedSceneSize() || guiManager_->IsNeedRecreate()) {
 
 		device_.WaitIdle(sqrp::QueueContextType::General);
-		//guiManager_->UpdateGUISize();
 		Recreate();
 		guiManager_->Recreate();
 	}
 
 	if (guiManager_->IsNeedReloadModel()) {
 		device_.WaitIdle(sqrp::QueueContextType::General);
-		MeshHandle mesh = device_.CreateMesh(string(MODEL_DIR) + guiManager_->GetNewModelPath());
+		GLTFMeshHandle mesh = device_.CreateGLTFMesh(string(MODEL_DIR) + guiManager_->GetNewModelPath());
 		MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR), guiManager_->GetNewModelPath());
 		models_.emplace(
 			mesh->GetName(),
@@ -889,12 +893,9 @@ void App::OnUpdate()
 	}
 
 	if (guiManager_->IsChangedEnvMap()) {
-		//guiManager_->UpdateGUISize();
 		Recreate();
 		guiManager_->Recreate();
-		//isChangedEnvMap_ = false;
 		guiManager_->SetIsChangedEnvMap(false);
-		//isChangedEnvMap_ = false;
 	}
 
 	camera_.Update(guiManager_->GetSceneViewSize().width, guiManager_->GetSceneViewSize().height);
@@ -925,13 +926,25 @@ void App::OnUpdate()
 		commandBuffer->BeginRenderPass(geometryRenderPass_, geometryFrameBuffer_, infligtIndex);
 		commandBuffer->SetViewport(guiManager_->GetSceneViewSize().width, guiManager_->GetSceneViewSize().height);
 		commandBuffer->SetScissor(guiManager_->GetSceneViewSize().width, guiManager_->GetSceneViewSize().height);
-		for (auto& [objectName, objectData] : objectData_) {
-			commandBuffer->BindPipeline(geomPipeline_, vk::PipelineBindPoint::eGraphics); // When there are no objects, pipeline is binded
-			std::string meshName = objectData->GetPModelData()->GetMesh()->GetName();
-			commandBuffer->BindDescriptorSet(geomPipeline_, geomDescriptorSets_[objectName][infligtIndex], vk::PipelineBindPoint::eGraphics);
-			commandBuffer->PushConstants(geomPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), models_.at(meshName)->GetMaterial()->GetPFactors());
-			commandBuffer->BindMeshBuffer(models_.at(meshName)->GetMesh());
-			commandBuffer->DrawMesh(models_.at(meshName)->GetMesh());
+		for (const auto& [objectName, objectData] : objectData_) {
+			const auto& mesh = objectData->GetPModelData()->GetMesh();
+			for (const auto& subMeshinfo : mesh->GetSubMeshInfos()) {
+				sqrp::TransformMatrix mat = subMeshinfo.mat;
+				int meshID = subMeshinfo.meshIndex;
+				int primitiveNum = mesh->GetPrimitiveNumPerMesh(meshID);
+				for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
+					int materialID = mesh->GetMaterialIndex(primitiveID);
+					Factors* factors = models_.at(mesh->GetName())->GetMaterial()->GetPFactors(materialID);
+					factors->model = mat.model;
+					factors->invTransModel = mat.invTransModel;
+					int materialIndex = mesh->GetMaterialIndex(primitiveID);
+					commandBuffer->BindPipeline(geomPipeline_, vk::PipelineBindPoint::eGraphics); // When there are no objects, pipeline is binded
+					commandBuffer->BindDescriptorSet(geomPipeline_, geomDescriptorSets_[objectName][meshID][primitiveID][infligtIndex], vk::PipelineBindPoint::eGraphics);
+					commandBuffer->PushConstants(geomPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), factors);
+					commandBuffer->BindMeshBuffer(mesh, sizeof(sqrp::Vertex) * mesh->GetVertexRange(primitiveID).offset, sizeof(uint32_t) * mesh->GetIndexRange(primitiveID).offset);
+					commandBuffer->DrawMesh(mesh, mesh->GetNumIndices(primitiveID));
+				}
+			}
 		}
 		commandBuffer->EndRenderPass();
 
@@ -975,11 +988,19 @@ void App::OnUpdate()
 		commandBuffer->BeginRenderPass(lightingRenderPass_, lightingFrameBuffer_, infligtIndex);
 		commandBuffer->SetViewport(guiManager_->GetSceneViewSize().width, guiManager_->GetSceneViewSize().height);
 		commandBuffer->SetScissor(guiManager_->GetSceneViewSize().width, guiManager_->GetSceneViewSize().height);
-		for (auto& [objectName, objectData] : objectData_) {
-			commandBuffer->BindPipeline(lightPipeline_, vk::PipelineBindPoint::eGraphics);
-			std::string meshName = objectData->GetPModelData()->GetMesh()->GetName();
-			commandBuffer->BindDescriptorSet(lightPipeline_, lightDescriptorSets_[objectName][infligtIndex], vk::PipelineBindPoint::eGraphics);
-			commandBuffer->Draw(3, 1); // Fullscreen Triangle
+		for (const auto& [objectName, objectData] : objectData_) {
+			const auto& mesh = objectData->GetPModelData()->GetMesh();
+			for (const auto& subMeshinfo : mesh->GetSubMeshInfos()) {
+				sqrp::TransformMatrix mat = subMeshinfo.mat;
+				int meshID = subMeshinfo.meshIndex;
+				int primitiveNum = mesh->GetPrimitiveNumPerMesh(meshID);
+				for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
+					commandBuffer->BindPipeline(lightPipeline_, vk::PipelineBindPoint::eGraphics);
+					std::string meshName = objectData->GetPModelData()->GetMesh()->GetName();
+					commandBuffer->BindDescriptorSet(lightPipeline_, lightDescriptorSets_[objectName][meshID][primitiveID][infligtIndex], vk::PipelineBindPoint::eGraphics);
+					commandBuffer->Draw(3, 1); // Fullscreen Triangle
+				}
+			}
 		}
 		commandBuffer->EndRenderPass();
 
@@ -997,13 +1018,25 @@ void App::OnUpdate()
 		commandBuffer->BeginRenderPass(forwardRenderPass_, forwardFrameBuffer_, infligtIndex);
 		commandBuffer->SetViewport(guiManager_->GetSceneViewSize().width, guiManager_->GetSceneViewSize().height);
 		commandBuffer->SetScissor(guiManager_->GetSceneViewSize().width, guiManager_->GetSceneViewSize().height);
-		for (auto& [objectName, objectData] : objectData_) {
-			commandBuffer->BindPipeline(forwardPipeline_, vk::PipelineBindPoint::eGraphics);
-			std::string meshName = objectData->GetPModelData()->GetMesh()->GetName();
-			commandBuffer->BindDescriptorSet(forwardPipeline_, forwardDescriptorSets_[objectName][infligtIndex], vk::PipelineBindPoint::eGraphics);
-			commandBuffer->PushConstants(forwardPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), models_.at(meshName)->GetMaterial()->GetPFactors());
-			commandBuffer->BindMeshBuffer(models_.at(meshName)->GetMesh());
-			commandBuffer->DrawMesh(models_.at(meshName)->GetMesh());
+		for (const auto& [objectName, objectData] : objectData_) {
+			const auto& mesh = objectData->GetPModelData()->GetMesh();
+			for (const auto& subMeshinfo : mesh->GetSubMeshInfos()) {
+				sqrp::TransformMatrix mat = subMeshinfo.mat;
+				int meshID = subMeshinfo.meshIndex;
+				int primitiveNum = mesh->GetPrimitiveNumPerMesh(meshID);
+				for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
+					int materialID = mesh->GetMaterialIndex(primitiveID);
+					Factors* factors = models_.at(mesh->GetName())->GetMaterial()->GetPFactors(materialID);
+					factors->model = mat.model;
+					factors->invTransModel = mat.invTransModel;
+					int materialIndex = mesh->GetMaterialIndex(primitiveID);
+					commandBuffer->BindPipeline(forwardPipeline_, vk::PipelineBindPoint::eGraphics);
+					commandBuffer->BindDescriptorSet(forwardPipeline_, forwardDescriptorSets_[objectName][meshID][primitiveID][infligtIndex], vk::PipelineBindPoint::eGraphics);
+					commandBuffer->PushConstants(forwardPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), factors);
+					commandBuffer->BindMeshBuffer(mesh, sizeof(sqrp::Vertex)* mesh->GetVertexRange(primitiveID).offset, sizeof(uint32_t)* mesh->GetIndexRange(primitiveID).offset);
+					commandBuffer->DrawMesh(mesh, mesh->GetNumIndices(primitiveID));
+				}
+			}
 		}
 		commandBuffer->EndRenderPass();
 	}
