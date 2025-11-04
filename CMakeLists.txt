@@ -1,15 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 project(tatter-renderer CXX)
 
-# ÉrÉãÉhÇÃê›íË
 add_executable(${PROJECT_NAME} "main.cpp" "App.cpp" "Material.cpp" "EnvironmentMap.cpp" "Scene.cpp" "GuiManager.cpp")
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus /utf-8>)
 
 add_subdirectory(sqrap-vk)
 
-find_package(Stb REQUIRED)
 find_package(imguizmo CONFIG REQUIRED)
+find_package(Stb REQUIRED)
 find_package(nfd CONFIG REQUIRED)
 
 target_link_libraries(
