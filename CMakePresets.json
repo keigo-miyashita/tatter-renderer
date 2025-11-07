@@ -1,0 +1,124 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21
+  },
+
+  "vendor": {
+    "microsoft.com/VisualStudioSettings/CMake/1.0": {
+      "intelliSenseMode": "windows-msvc-x64",
+      "hostOS": [ "windows" ]
+    }
+  },
+
+  "configurePresets": [
+    {
+      "name": "win-x64-Debug",
+      "displayName": "Windows x64 Debug",
+      "description": "Debug build using Ninja and MSVC on Windows",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/win-x64-Debug",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/external/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/win-x64-Debug"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "win-x64-Release",
+      "displayName": "Windows x64 Release",
+      "description": "Release build using Ninja and MSVC on Windows",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/win-x64-Release",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/external/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/win-x64-Release"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+
+    {
+      "name": "linux-x64-Debug",
+      "displayName": "Linux x64 Debug",
+      "description": "Debug build using Ninja and GCC on Linux",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/linux-x64-Debug",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/external/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/linux-x64-Debug"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "linux-x64-Release",
+      "displayName": "Linux x64 Release",
+      "description": "Release build using Ninja and GCC on Linux",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/linux-x64-Release",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/external/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/linux-x64-Release"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    }
+  ],
+
+  "buildPresets": [
+    {
+      "name": "win-x64-Debug",
+      "configurePreset": "win-x64-Debug"
+    },
+    {
+      "name": "win-x64-Release",
+      "configurePreset": "win-x64-Release"
+    },
+    {
+      "name": "linux-x64-Debug",
+      "configurePreset": "linux-x64-Debug"
+    },
+    {
+      "name": "linux-x64-Release",
+      "configurePreset": "linux-x64-Release"
+    }
+  ],
+
+  "testPresets": [
+    {
+      "name": "win-x64-Debug",
+      "configurePreset": "win-x64-Debug"
+    },
+    {
+      "name": "win-x64-Release",
+      "configurePreset": "win-x64-Release"
+    },
+    {
+      "name": "linux-x64-Debug",
+      "configurePreset": "linux-x64-Debug"
+    },
+    {
+      "name": "linux-x64-Release",
+      "configurePreset": "linux-x64-Release"
+    }
+  ]
+}

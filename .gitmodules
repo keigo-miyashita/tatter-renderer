@@ -1,3 +1,6 @@
 [submodule "sqrap-vk"]
 	path = sqrap-vk
 	url = https://github.com/keigo-miyashita/sqrap-vk.git
+[submodule "external/vcpkg"]
+	path = external/vcpkg
+	url = https://github.com/microsoft/vcpkg.git
