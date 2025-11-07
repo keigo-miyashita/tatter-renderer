@@ -3,6 +3,7 @@
 #include <pch.hpp>
 #include <sqrap.hpp>
 
+#include <ImGuizmo.h>
 #include <nfd.hpp>
 
 enum GuiEdge : int
