@@ -69,8 +69,8 @@ layout(location = 3) out vec2 fUV;
 void main()
 {
 	fWorldPosition = object.model * vPosition;
-	vec3 normal = normalize(object.ITModel * vNormal).rgb;
-	vec3 tangent = normalize(object.model * vTangent).rgb;
+	vec3 normal = normalize(mat3(object.ITModel) * vNormal.rgb).rgb;
+	vec3 tangent = normalize(mat3(object.model) * vTangent.rgb).rgb;
 	tangent = normalize(tangent - dot(tangent, normal) * normal);
 	vec3 bitangent = normalize(cross(normal, tangent)) * vTangent.w;
 	mat3 TBN = mat3(tangent, bitangent, normal);
