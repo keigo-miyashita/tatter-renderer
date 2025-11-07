@@ -42,7 +42,7 @@ private:
 	std::vector<SubMaterialInfo> subMaterialInfos_;
 
 public:
-    Material(const sqrp::Device& device, std::string modelDir, std::string modelName);
+    Material(const sqrp::Device& device, std::string modelPath);
 	~Material() = default;
 
     sqrp::ImageHandle LoadTexture(const tinygltf::Model& model, int texIndex, int useChannelNum, vk::Format format);

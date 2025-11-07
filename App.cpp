@@ -646,7 +646,7 @@ void App::OnStart()
 	);
 
 	GLTFMeshHandle mesh = device_.CreateGLTFMesh(string(MODEL_DIR) + "DamagedHelmet.gltf");
-	MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR), "DamagedHelmet.gltf");
+	MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR) + "DamagedHelmet.gltf");
 	models_.emplace(
 		mesh->GetName(),
 		std::make_shared<ModelData>(mesh, material)
@@ -889,7 +889,7 @@ void App::OnUpdate()
 
 		if (newModelPath_ != "") {
 			GLTFMeshHandle mesh = device_.CreateGLTFMesh(string(MODEL_DIR) + newModelPath_);
-			MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR), newModelPath_);
+			MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR) + newModelPath_);
 			models_.emplace(
 				mesh->GetName(),
 				std::make_shared<ModelData>(mesh, material)

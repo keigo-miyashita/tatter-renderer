@@ -2,14 +2,18 @@
 
 using namespace std;
 
-Material::Material(const sqrp::Device& device, std::string modelDir, std::string modelName)
-	: pDevice_(&device), modelDir_(modelDir)
+Material::Material(const sqrp::Device& device, std::string modelPath)
+	: pDevice_(&device)
 {
+	std::filesystem::path path(modelPath);
+	modelDir_ = path.parent_path().string() + "/";
+	cout << modelDir_ << endl;
+
 	tinygltf::Model model;
 	tinygltf::TinyGLTF loader;
 	string err, warn;
 
-	bool success = loader.LoadASCIIFromFile(&model, &err, &warn, (modelDir_ + modelName).c_str());
+	bool success = loader.LoadASCIIFromFile(&model, &err, &warn, modelPath.c_str());
 	if (!success) {
 		throw std::runtime_error("failed to load gltf");
 	}
