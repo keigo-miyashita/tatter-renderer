@@ -18,7 +18,7 @@ sqrp::ImageHandle GuiManager::CreateIcon(std::string path)
 	stbi_image_free(pixels);
 
 
-	sqrp::BufferHandle stagingBuffer = app_->device_.CreateBuffer(texWidth * texHeight * 4 * sizeof(uint8_t), vk::BufferUsageFlagBits::eTransferSrc, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
+	sqrp::BufferHandle stagingBuffer = app_->device_.CreateBuffer("iconStaging", texWidth * texHeight * 4 * sizeof(uint8_t), vk::BufferUsageFlagBits::eTransferSrc, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
 	stagingBuffer->Write(data.data(), texWidth * texHeight * 4 * sizeof(uint8_t));
 
 	vk::ImageCreateInfo iconImageInfo = {};
@@ -106,14 +106,12 @@ GuiManager::GuiManager(App* app)
 		(uint32_t)(app_->windowWidth_ * sceneViewScaleX_),
 		(uint32_t)(app_->windowHeight_ * sceneViewScaleY_)
 	};
-	cout << "sceneViewSize_ initialize : " << sceneViewSize_.width << " " << sceneViewSize_.height << " " << sceneViewSize_.changedWidth << " " << sceneViewSize_.changedHeight << endl;
 	inspectorViewSize_ = {
 		(uint32_t)(app_->windowWidth_ - (sceneViewSize_.width)),
 		(uint32_t)(app_->windowHeight_),
-		(uint32_t)(app_->windowWidth_ * (sceneViewSize_.width)),
+		(uint32_t)(app_->windowWidth_ - (sceneViewSize_.width)),
 		(uint32_t)(app_->windowHeight_)
 	};
-	cout << "inspectorViewSize_ initialize : " << inspectorViewSize_.width << " " << inspectorViewSize_.height << " " << inspectorViewSize_.changedWidth << " " << inspectorViewSize_.changedHeight << endl;
 	assetViewSize_ = {
 		(uint32_t)(sceneViewSize_.width),
 		(uint32_t)(app_->windowHeight_ - (sceneViewSize_.height)),
@@ -125,7 +123,9 @@ GuiManager::GuiManager(App* app)
 
 	guiDescriptorSets_.resize(inflightCount);
 	for (int i = 0; i < inflightCount; i++) {
-		guiDescriptorSets_[i] = app_->device_.CreateDescriptorSet({
+		guiDescriptorSets_[i] = app_->device_.CreateDescriptorSet(
+			"gui" + std::to_string(i),
+			{
 			{ app_->toneMappedImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment},
 			}
 		);
@@ -135,17 +135,23 @@ GuiManager::GuiManager(App* app)
 	rotationIconImage_ = CreateIcon("C:\\projects\\Vulkan\\tatter-renderer\\icon\\rotation.png");
 	scaleIconImage_ = CreateIcon("C:\\projects\\Vulkan\\tatter-renderer\\icon\\scale.png");
 
-	translateIconDescSet_ = app_->device_.CreateDescriptorSet({
+	translateIconDescSet_ = app_->device_.CreateDescriptorSet(
+		"translateIcon",
+		{
 		{ translateIconImage_, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment }
 		}
 	);
 
-	rotationIconDescSet_ = app_->device_.CreateDescriptorSet({
+	rotationIconDescSet_ = app_->device_.CreateDescriptorSet(
+		"rotationIcon",
+		{
 		{ rotationIconImage_, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment }
 		}
 	);
 
-	scaleIconDescSet_ = app_->device_.CreateDescriptorSet({
+	scaleIconDescSet_ = app_->device_.CreateDescriptorSet(
+		"scaleIcon",
+		{
 		{ scaleIconImage_, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment }
 		}
 	);
@@ -561,7 +567,9 @@ void GuiManager::Recreate()
 	guiDescriptorSets_.clear();
 	guiDescriptorSets_.resize(app_->swapchain_->GetInflightCount());
 	for (int i = 0; i < app_->swapchain_->GetInflightCount(); i++) {
-		guiDescriptorSets_[i] = app_->device_.CreateDescriptorSet({
+		guiDescriptorSets_[i] = app_->device_.CreateDescriptorSet(
+			"gui" + std::to_string(i),
+			{
 			{ app_->toneMappedImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment},
 			}
 		);

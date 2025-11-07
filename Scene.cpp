@@ -44,7 +44,7 @@ ObjectData::ObjectData(
 	name_ = model_->GetMesh()->GetName() + to_string(model_->GetNumInstance());
 	model_->IncrementInstance();
 
-	objectBuffer_ = device.CreateBuffer(sizeof(sqrp::TransformMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
+	objectBuffer_ = device.CreateBuffer("_object", sizeof(sqrp::TransformMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	//objectBuffer_->Write(object_);
 	objectBuffer_->Write(GetTransform());
 }

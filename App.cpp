@@ -16,7 +16,7 @@ sqrp::ImageHandle App::CreateIcon(std::string path)
 	stbi_image_free(pixels);
 
 
-	sqrp::BufferHandle stagingBuffer = device_.CreateBuffer(texWidth * texHeight * 4 * sizeof(uint8_t), vk::BufferUsageFlagBits::eTransferSrc, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
+	sqrp::BufferHandle stagingBuffer = device_.CreateBuffer("iconStaging", texWidth * texHeight * 4 * sizeof(uint8_t), vk::BufferUsageFlagBits::eTransferSrc, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
 	stagingBuffer->Write(data.data(), texWidth * texHeight * 4 * sizeof(uint8_t));
 
 	vk::ImageCreateInfo iconImageInfo = {};
@@ -139,7 +139,9 @@ void App::Recreate()
 				geomDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
 				lightDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
 				for (int frameID = 0; frameID < swapchain_->GetInflightCount(); frameID++) {
-					forwardDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+					forwardDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet(
+						"forward" + std::to_string(frameID),
+						{
 						{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
@@ -153,7 +155,9 @@ void App::Recreate()
 						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
 						}
 					);
-					geomDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+					geomDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet(
+						"geometry" + std::to_string(frameID),
+						{
 						{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
@@ -165,7 +169,9 @@ void App::Recreate()
 						}
 						);
 
-					lightDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+					lightDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet(
+						"lighting" + std::to_string(frameID),
+						{
 						{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ baseColorMetallnessImages_[frameID], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
@@ -188,13 +194,17 @@ void App::Recreate()
 	toneMapDescriptorSets_.resize(swapchain_->GetInflightCount());
 	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
 
-		skyboxDescriptorSets_[i] = device_.CreateDescriptorSet({
-		{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
-		{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetEnvMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+		skyboxDescriptorSets_[i] = device_.CreateDescriptorSet(
+			"skybox" + std::to_string(i),
+			{
+			{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
+			{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetEnvMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 			}
 		);
 
-		toneMapDescriptorSets_[i] = device_.CreateDescriptorSet({
+		toneMapDescriptorSets_[i] = device_.CreateDescriptorSet(
+			"tonemap" + std::to_string(i),
+			{
 			{ renderImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
 			}
 		);
@@ -206,6 +216,7 @@ void App::Recreate()
 
 	if (objectData_.size() != 0) {
 		forwardPipeline_ = device_.CreateGraphicsPipeline(
+			"foward",
 			forwardRenderPass_, swapchain_, forwardVertShader_, forwardPixelShader_,
 			forwardDescriptorSets_.begin()->second[0][0][0],
 			vk::PushConstantRange()
@@ -214,6 +225,7 @@ void App::Recreate()
 			.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		);
 		geomPipeline_ = device_.CreateGraphicsPipeline(
+			"geometry",
 			geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_,
 			geomDescriptorSets_.begin()->second[0][0][0],
 			vk::PushConstantRange()
@@ -222,17 +234,20 @@ void App::Recreate()
 			.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		);
 		lightPipeline_ = device_.CreateGraphicsPipeline(
+			"lighting",
 			lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_,
 			lightDescriptorSets_.begin()->second[0][0][0], {}, true, false
 		);
 	}
 
 	skyboxPipeline_ = device_.CreateGraphicsPipeline(
+		"skybox",
 		skyboxRenderPass_, swapchain_, skyboxVertShader_, skyboxPixelShader_,
 		skyboxDescriptorSets_[0], {}, false, false
 	);
 
 	toneMapPipeline_ = device_.CreateGraphicsPipeline(
+		"tonemap",
 		toneMapRenderPass_, swapchain_, toneMapVertShader_, toneMapPixelShader_,
 		toneMapDescriptorSets_[0], {}, true, false
 	);
@@ -418,6 +433,7 @@ void App::OnStart()
 	forwardSubpass.attachmentInfos = { "RenderingResult", "Depth"};
 
 	forwardRenderPass_ = device_.CreateRenderPass(
+		"forward",
 		{ forwardSubpass }, forwardAttachmentNameToInfo
 	);
 
@@ -462,6 +478,7 @@ void App::OnStart()
 	geometrySubpass.attachmentInfos = {"BaseColorMetallness", "NormalRoughness", "EmissiveAO",  "Depth"};
 
 	geometryRenderPass_ = device_.CreateRenderPass(
+		"geometry",
 		{ geometrySubpass }, geometryAttachmentNameToInfo
 	);
 
@@ -483,6 +500,7 @@ void App::OnStart()
 	lightingSubpass.attachmentInfos = { "RenderingResult"};
 
 	lightingRenderPass_ = device_.CreateRenderPass(
+		"lighting",
 		{ lightingSubpass }, lightingAttachmentNameToInfo
 	);
 
@@ -512,6 +530,7 @@ void App::OnStart()
 	skyboxSubpass.attachmentInfos = { "RenderingResult", "Depth" };
 
 	skyboxRenderPass_ = device_.CreateRenderPass(
+		"skybox",
 		{ skyboxSubpass }, skyboxAttachmentNameToInfo
 	);
 
@@ -533,6 +552,7 @@ void App::OnStart()
 	toneMapSubpass.attachmentInfos = { "toneMapped" };
 
 	toneMapRenderPass_ = device_.CreateRenderPass(
+		"tonemap",
 		{ toneMapSubpass }, toneMapAttachmentNameToInfo
 	);
 
@@ -554,10 +574,12 @@ void App::OnStart()
 	presentSubpass.attachmentInfos = { "Swapchain" };
 
 	presentRenderPass_ = device_.CreateRenderPass(
+		"present",
 		{ presentSubpass }, presentAttachmentNameToInfo
 	);
 
 	forwardFrameBuffer_ = device_.CreateFrameBuffer(
+		"forward",
 		forwardRenderPass_,
 		{
 			{ renderImages_ },
@@ -569,6 +591,7 @@ void App::OnStart()
 	);
 
 	geometryFrameBuffer_ = device_.CreateFrameBuffer(
+		"geometry",
 		geometryRenderPass_,
 		{
 			{ baseColorMetallnessImages_ },
@@ -582,6 +605,7 @@ void App::OnStart()
 	);
 
 	lightingFrameBuffer_ = device_.CreateFrameBuffer(
+		"lighting",
 		lightingRenderPass_,
 		{
 			{ renderImages_ },
@@ -592,6 +616,7 @@ void App::OnStart()
 	);
 
 	skyboxFrameBuffer_ = device_.CreateFrameBuffer(
+		"skybox",
 		skyboxRenderPass_,
 		{
 			{ renderImages_ },
@@ -603,6 +628,7 @@ void App::OnStart()
 	);
 
 	toneMapFrameBuffer_ = device_.CreateFrameBuffer(
+		"tonemap",
 		toneMapRenderPass_,
 		{
 			{ toneMappedImages_ }
@@ -613,6 +639,7 @@ void App::OnStart()
 	);
 
 	presentFrameBuffer_ = device_.CreateFrameBuffer(
+		"present",
 		presentRenderPass_,
 		swapchain_,
 		{}
@@ -631,16 +658,16 @@ void App::OnStart()
 	light0_.pos = glm::vec4(10.0f, 10.0f, 5.0f, 1.0f);
 	light0_.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	cameraBuffer_ = device_.CreateBuffer(sizeof(CameraMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
+	cameraBuffer_ = device_.CreateBuffer("camera", sizeof(CameraMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	cameraBuffer_->Write(CameraMatrix{ camera_.GetView(), camera_.GetProj() });
 
-	lightBuffer_ = device_.CreateBuffer(sizeof(Light), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
+	lightBuffer_ = device_.CreateBuffer("light", sizeof(Light), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	lightBuffer_->Write(light0_);
 
-	colorBuffer_ = device_.CreateBuffer(sizeof(glm::vec4), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
+	colorBuffer_ = device_.CreateBuffer("color", sizeof(glm::vec4), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	colorBuffer_->Write(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 
-	detailCameraBuffer_ = device_.CreateBuffer(sizeof(DetailCamera), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
+	detailCameraBuffer_ = device_.CreateBuffer("detailCamera", sizeof(DetailCamera), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	detailCameraBuffer_->Write(DetailCamera{ camera_.GetView(), camera_.GetProj(), camera_.GetInvView(), camera_.GetInvProj(), camera_.GetPos(), camera_.GetNearClip(), camera_.GetFarClip()});
 
 	forwardVertShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "forward.shader", sqrp::ShaderType::Vertex);
@@ -686,7 +713,9 @@ void App::OnStart()
 				geomDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
 				lightDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
 				for (int frameID = 0; frameID < swapchain_->GetInflightCount(); frameID++) {
-					forwardDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+					forwardDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet(
+						"forward" + to_string(frameID),
+						{
 						{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
@@ -700,7 +729,9 @@ void App::OnStart()
 						{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetBrdfLUT(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
 						}
 					);
-					geomDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+					geomDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet(
+						"geometry" + to_string(frameID),
+						{
 						{ cameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ objectData->GetObjectBuffer(), vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
@@ -712,7 +743,9 @@ void App::OnStart()
 						}
 						);
 
-					lightDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet({
+					lightDescriptorSets_[objectName][meshID][primitiveID][frameID] = device_.CreateDescriptorSet(
+						"lighting" + to_string(frameID),
+						{
 						{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ lightBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 						{ baseColorMetallnessImages_[frameID], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
@@ -732,13 +765,17 @@ void App::OnStart()
 	skyboxDescriptorSets_.resize(swapchain_->GetInflightCount());
 	toneMapDescriptorSets_.resize(swapchain_->GetInflightCount());
 	for (int i = 0; i < swapchain_->GetInflightCount(); i++) {
-		skyboxDescriptorSets_[i] = device_.CreateDescriptorSet({
+		skyboxDescriptorSets_[i] = device_.CreateDescriptorSet(
+			"skybox" + to_string(i),
+			{
 			{ detailCameraBuffer_, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 			{ envMaps_[guiManager_->GetSelectedEnvMapName()]->GetEnvMap(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment },
 			}
 		);
 
-		toneMapDescriptorSets_[i] = device_.CreateDescriptorSet({
+		toneMapDescriptorSets_[i] = device_.CreateDescriptorSet(
+			"tonemap" + to_string(i),
+			{
 			{ renderImages_[i], vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
 			}
 		);
@@ -747,6 +784,7 @@ void App::OnStart()
 
 	if (objectData_.size() != 0) {
 		forwardPipeline_ = device_.CreateGraphicsPipeline(
+			"forward",
 			forwardRenderPass_, swapchain_, forwardVertShader_, forwardPixelShader_,
 			forwardDescriptorSets_.begin()->second[0][0][0],
 			vk::PushConstantRange()
@@ -755,6 +793,7 @@ void App::OnStart()
 			.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		);
 		geomPipeline_ = device_.CreateGraphicsPipeline(
+			"geometry",
 			geometryRenderPass_, swapchain_, geomVertShader_, geomPixelShader_,
 			geomDescriptorSets_.begin()->second[0][0][0],
 			vk::PushConstantRange()
@@ -763,17 +802,20 @@ void App::OnStart()
 			.setStageFlags(vk::ShaderStageFlagBits::eFragment)
 		);
 		lightPipeline_ = device_.CreateGraphicsPipeline(
+			"lighting",
 			lightingRenderPass_, swapchain_, lightVertShader_, lightPixelShader_,
 			lightDescriptorSets_.begin()->second[0][0][0], {}, true, false
 		);
 	}
 
 	skyboxPipeline_ = device_.CreateGraphicsPipeline(
+		"skybox",
 		skyboxRenderPass_, swapchain_, skyboxVertShader_, skyboxPixelShader_,
 		skyboxDescriptorSets_[0], {}, false, false
 	);
 
 	toneMapPipeline_ = device_.CreateGraphicsPipeline(
+		"tonemap",
 		toneMapRenderPass_, swapchain_, toneMapVertShader_, toneMapPixelShader_,
 		toneMapDescriptorSets_[0], {}, true, false
 	);

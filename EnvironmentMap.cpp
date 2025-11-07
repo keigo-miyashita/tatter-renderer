@@ -20,7 +20,7 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
 	cout << "Loaded HDR image: " << name << " (" << w << "x" << h << ", channels: " << c << ")" << endl;
 
 
-    stagingBuffer_ = pDevice_->CreateBuffer(width_ * height_ * 4 * sizeof(float), vk::BufferUsageFlagBits::eTransferSrc, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
+    stagingBuffer_ = pDevice_->CreateBuffer("envMapStaging", width_ * height_ * 4 * sizeof(float), vk::BufferUsageFlagBits::eTransferSrc, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
     stagingBuffer_->Write(data.data(), width_ * height_ * 4 * sizeof(float));
 	
     vk::ImageCreateInfo envTextureImageInfo = {};
@@ -99,18 +99,23 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
 
 	cout << "sizeof(Sizes): " << sizeof(Sizes) << endl;
     sqrp::BufferHandle sizesBuffer = pDevice_->CreateBuffer(
+        "size",
         sizeof(Sizes),
         vk::BufferUsageFlagBits::eUniformBuffer,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST
     );
 	sizesBuffer->Write(sizes);
 
-    sqrp::DescriptorSetHandle envMapDescSet = pDevice_->CreateDescriptorSet({
+    sqrp::DescriptorSetHandle envMapDescSet = pDevice_->CreateDescriptorSet(
+        "envmap",
+        {
         { envTexture_, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eCompute },
         { envMap_, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute},
         { sizesBuffer, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eCompute},
-	});
+	    }
+    );
     sqrp::ComputePipelineHandle envMapPipeline = pDevice_->CreateComputePipeline(
+        "envMap",
         envmap, envMapDescSet,
         vk::PushConstantRange{
         vk::ShaderStageFlagBits::eCompute,
@@ -239,11 +244,15 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
         brdfLUTSamplerInfo
     );
 
-    sqrp::DescriptorSetHandle irradianceDescSet = pDevice_->CreateDescriptorSet({
+    sqrp::DescriptorSetHandle irradianceDescSet = pDevice_->CreateDescriptorSet(
+        "irradiance",
+        {
         { envMap_, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eCompute },
         { irradianceMap_, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute },
-    });
+        }
+    );
     sqrp::ComputePipelineHandle irradiancePipeline = pDevice_->CreateComputePipeline(
+		"irradiance",
         irradiance, irradianceDescSet,
         vk::PushConstantRange{
         vk::ShaderStageFlagBits::eCompute,
@@ -251,7 +260,9 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
         sizeof(Push)
     });
 
-    sqrp::DescriptorSetHandle prefilterDescSet = pDevice_->CreateDescriptorSet({
+    sqrp::DescriptorSetHandle prefilterDescSet = pDevice_->CreateDescriptorSet(
+		"prefilter",
+        {
         { envMap_, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eCompute },
         { prefilterMap_, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute, 0 },
         { prefilterMap_, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute, 1 },
@@ -265,6 +276,7 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
         { prefilterMap_, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute, 9 },
         });
     sqrp::ComputePipelineHandle prefilterPipeline = pDevice_->CreateComputePipeline(
+		"prefilter",
         prefilter, prefilterDescSet,
         vk::PushConstantRange{
         vk::ShaderStageFlagBits::eCompute,
@@ -272,10 +284,14 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
         sizeof(Push)
     });
 
-    sqrp::DescriptorSetHandle brdfLUTDescSet = pDevice_->CreateDescriptorSet({
+    sqrp::DescriptorSetHandle brdfLUTDescSet = pDevice_->CreateDescriptorSet(
+        "brdfLUT",
+        {
         { brdfLUT_, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute },
-    });
+        }
+    );
     sqrp::ComputePipelineHandle brdfLUTPipeline = pDevice_->CreateComputePipeline(
+		"brdfLUT",
         brdfLUT, brdfLUTDescSet
     );
 

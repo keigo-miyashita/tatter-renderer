@@ -110,7 +110,7 @@ sqrp::ImageHandle Material::LoadTexture(const tinygltf::Model& model, int texInd
         }
     }
 
-	sqrp::BufferHandle stagingBuffer = pDevice_->CreateBuffer(width * height * useChannelNum * sizeof(unsigned char), vk::BufferUsageFlagBits::eTransferSrc, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
+	sqrp::BufferHandle stagingBuffer = pDevice_->CreateBuffer("materialStaging", width * height * useChannelNum * sizeof(unsigned char), vk::BufferUsageFlagBits::eTransferSrc, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
 	stagingBuffer->Write(packedPixels.data(), packedPixels.size());
 	cout << "Loaded texture image: " << imageName << " (" << width << "x" << height << ", channels: " << channels << ")" << endl;
 
