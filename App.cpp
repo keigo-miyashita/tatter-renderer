@@ -222,7 +222,7 @@ void App::Recreate()
 			vk::PushConstantRange()
 			.setOffset(0)
 			.setSize(sizeof(Factors))
-			.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+			.setStageFlags(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
 		);
 		geomPipeline_ = device_.CreateGraphicsPipeline(
 			"geometry",
@@ -231,7 +231,7 @@ void App::Recreate()
 			vk::PushConstantRange()
 			.setOffset(0)
 			.setSize(sizeof(Factors))
-			.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+			.setStageFlags(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
 		);
 		lightPipeline_ = device_.CreateGraphicsPipeline(
 			"lighting",
@@ -790,7 +790,7 @@ void App::OnStart()
 			vk::PushConstantRange()
 			.setOffset(0)
 			.setSize(sizeof(Factors))
-			.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+			.setStageFlags(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
 		);
 		geomPipeline_ = device_.CreateGraphicsPipeline(
 			"geometry",
@@ -799,7 +799,7 @@ void App::OnStart()
 			vk::PushConstantRange()
 			.setOffset(0)
 			.setSize(sizeof(Factors))
-			.setStageFlags(vk::ShaderStageFlagBits::eFragment)
+			.setStageFlags(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
 		);
 		lightPipeline_ = device_.CreateGraphicsPipeline(
 			"lighting",
@@ -945,7 +945,7 @@ void App::OnUpdate()
 					int materialIndex = mesh->GetMaterialIndex(primitiveID);
 					commandBuffer->BindPipeline(geomPipeline_, vk::PipelineBindPoint::eGraphics); // When there are no objects, pipeline is binded
 					commandBuffer->BindDescriptorSet(geomPipeline_, geomDescriptorSets_[objectName][meshID][primitiveID][infligtIndex], vk::PipelineBindPoint::eGraphics);
-					commandBuffer->PushConstants(geomPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), factors);
+					commandBuffer->PushConstants(geomPipeline_, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, sizeof(Factors), factors);
 					commandBuffer->BindMeshBuffer(mesh, sizeof(sqrp::Vertex) * mesh->GetVertexRange(primitiveID).offset, sizeof(uint32_t) * mesh->GetIndexRange(primitiveID).offset);
 					commandBuffer->DrawMesh(mesh, mesh->GetNumIndices(primitiveID));
 				}
@@ -1037,7 +1037,7 @@ void App::OnUpdate()
 					int materialIndex = mesh->GetMaterialIndex(primitiveID);
 					commandBuffer->BindPipeline(forwardPipeline_, vk::PipelineBindPoint::eGraphics);
 					commandBuffer->BindDescriptorSet(forwardPipeline_, forwardDescriptorSets_[objectName][meshID][primitiveID][infligtIndex], vk::PipelineBindPoint::eGraphics);
-					commandBuffer->PushConstants(forwardPipeline_, vk::ShaderStageFlagBits::eFragment, sizeof(Factors), factors);
+					commandBuffer->PushConstants(forwardPipeline_, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, sizeof(Factors), factors);
 					commandBuffer->BindMeshBuffer(mesh, sizeof(sqrp::Vertex)* mesh->GetVertexRange(primitiveID).offset, sizeof(uint32_t)* mesh->GetIndexRange(primitiveID).offset);
 					commandBuffer->DrawMesh(mesh, mesh->GetNumIndices(primitiveID));
 				}
