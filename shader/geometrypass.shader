@@ -94,9 +94,9 @@ void main()
 
 	vec3 normal = fNormal.rgb;
 	float roughness = texture(metallicRoughnessTexture, fUV).b * factors.roughness;
+	// Correct range from [-1,+1] to [0,1] for storage UNORM
     outNormalRoughness = vec4((normal.rgb + 1.0f) * 0.5f, roughness);
 
-    // í«â¡èÓïÒÅió·: roughness, metallicÅj
 	vec3 emissive = texture(emissiveTexture, fUV).rgb * factors.emissive;
 	float ao = texture(occlusionTexture, fUV).r;
     outEmissiveAO = vec4(emissive.rgb, ao);

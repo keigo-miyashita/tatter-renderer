@@ -41,12 +41,18 @@ vec3 GetDirection(int face, vec2 uv)
     // else if (face == 0)  dir = normalize(vec3(uv.x,   uv.y, -1.0)); // +Z
     // else if (face == 1)  dir = normalize(vec3(-uv.x,  uv.y,  1.0)); // -Z
 
-    if (face == 0)       dir = normalize(vec3( 1.0,  -uv.y, -uv.x)); // +X (when +x is max)
-    else if (face == 1)  dir = normalize(vec3(-1.0,  -uv.y,  uv.x)); // -X (when -x is max)
-    else if (face == 2)  dir = normalize(vec3( uv.x,   1.0, uv.y)); // +Y (when +y is max)
-    else if (face == 3)  dir = normalize(vec3( uv.x,  -1.0,  -uv.y)); // -Y (when -y is max)
-    else if (face == 4)  dir = normalize(vec3(uv.x,  -uv.y,  1.0)); // +Z (when +z is max)
-    else if (face == 5)  dir = normalize(vec3(-uv.x, -uv.y,  -1.0)); // -Z (when -z is max)
+    // +X (when +x is max)
+         if (face == 0)     dir = normalize(vec3( 1.0,  -uv.y, -uv.x));
+    // -X (when -x is max)
+    else if (face == 1)     dir = normalize(vec3(-1.0,  -uv.y,  uv.x));
+    // +Y (when +y is max)
+    else if (face == 2)     dir = normalize(vec3( uv.x,   1.0, uv.y));
+    // -Y (when -y is max)
+    else if (face == 3)     dir = normalize(vec3( uv.x,  -1.0,  -uv.y));
+    // +Z (when +z is max)
+    else if (face == 4)     dir = normalize(vec3(uv.x,  -uv.y,  1.0));
+    // -Z (when -z is max)
+    else if (face == 5)     dir = normalize(vec3(-uv.x, -uv.y,  -1.0));
 
     return dir;
 }

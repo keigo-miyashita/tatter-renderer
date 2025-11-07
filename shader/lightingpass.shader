@@ -20,11 +20,13 @@ layout(std140, set = 0, binding = 1) uniform Light
 	vec4 lightColor;
 } light;
 
-// G-Buffer サンプラー
+// G-Buffer
 layout(set = 0, binding = 2) uniform sampler2D gBaseColorMetallness;
 layout(set = 0, binding = 3) uniform sampler2D gNormalRoughness;
 layout(set = 0, binding = 4) uniform sampler2D gEmissiveAO;
 layout(set = 0, binding = 5) uniform sampler2D gDepth;
+
+// prefiltered environment maps
 layout(set = 0, binding = 6) uniform samplerCube irradianceMap;
 layout(set = 0, binding = 7) uniform samplerCube prefilterMap;
 layout(set = 0, binding = 8) uniform sampler2D brdfLUT;
@@ -34,18 +36,18 @@ layout(location = 0) out vec2 fragUV;
 
 void main()
 {
-    // フルスクリーントライアングル（Y反転対応）
+    // Full screen triangle (Y-flip compatible)
     vec2 positions[3] = vec2[](
-        vec2(-1.0, -1.0), // 左下 NDC
-        vec2( 3.0, -1.0), // 右下 NDC
-        vec2(-1.0,  3.0)  // 左上 NDC
+        vec2(-1.0, -1.0), // left-bottom NDC
+        vec2( 3.0, -1.0), // right-bottom NDC
+        vec2(-1.0,  3.0)  // left-top NDC
     );
 
     gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
 
-    // UV生成（Y反転補正）
+    // generate UV
     fragUV = (gl_Position.xy * 0.5) + 0.5; // [-1,+1] → [0,1]
-    fragUV.y = 1.0 - fragUV.y;             // Y反転補正
+    fragUV.y = 1.0 - fragUV.y;             // Y-flip correction
 }
 #endif
 
@@ -121,6 +123,7 @@ vec3 DiffuseLambert(vec3 diffuseColor) {
 void main()
 {
     vec3 baseColor  = texture(gBaseColorMetallness, fragUV).rgb;
+    // Correct range from [0,1] to [-1,+1] to [0,1]
     vec3 normal  = texture(gNormalRoughness, fragUV).rgb * 2.0f - 1.0f;
     float metalic      = texture(gBaseColorMetallness, fragUV).a;
     float roughness = texture(gNormalRoughness, fragUV).a;
@@ -140,7 +143,7 @@ void main()
     float NdotH = clamp(dot(normal, h), 0.001, 1.0);
     float VdotH = clamp(dot(v, h), 0.001, 1.0);
 
-    vec3 dielectoricF0 = vec3(0.04); // 非金属のF0
+    vec3 dielectoricF0 = vec3(0.04); // F0 for non-metallic
     vec3 specularColor = mix(dielectoricF0, baseColor, metalic);
     vec3 diffuseColor = baseColor * (1.0 - metalic);
 
