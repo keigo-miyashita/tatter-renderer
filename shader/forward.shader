@@ -94,16 +94,9 @@ layout(location = 3) in vec2 fUV;
 
 layout(location = 0) out vec4 outColor;   // Base Color + Metalness
 
-// ---------------------------
-// マイクロファセット関連関数（理論実装）
-//   - D: GGX (Trowbridge-Reitz)
-//   - G: Smith-Schlick-GGX（Karis / UE4）
-//   - F: Schlick の近似（色ベース）
-// ---------------------------
-
-// Fresnel: Schlick近似（色ベース）
+// Fresnel: Schlick approximation
+// F0 + (F90 - F0) * (1 - cosTheta)^5
 vec3 FresnelSchlick(float cosTheta, vec3 F0, vec3 F90) {
-    // F0 + (F90 - F0) * (1 - cosTheta)^5
     float powTerm = pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
     return mix(F0, F90, powTerm);
 }
@@ -116,9 +109,9 @@ float DistributionGGX(float NdotH, float alphaRoughness) {
     return a2 / (PI * denom * denom);
 }
 
-// Geometry (Smith-Schlick-GGX) - UE4の式寄り
+// Geometry (Smith-Schlick-GGX)
+// k = (alpha + 1)^2 / 8, G1 = NdotX / (NdotX * (1 - k) + k)
 float GeometrySmith(float NdotV, float NdotL, float alphaRoughness) {
-    // UE4 uses: k = (alpha + 1)^2 / 8, G1 = NdotX / (NdotX * (1 - k) + k)
     float a = alphaRoughness;
     float k = (a + 1.0) * (a + 1.0) / 8.0;
     float Gv = NdotV / (NdotV * (1.0 - k) + k);
@@ -126,19 +119,23 @@ float GeometrySmith(float NdotV, float NdotL, float alphaRoughness) {
     return Gv * Gl;
 }
 
-// Lambertian diffuse (energy-conserving)
+// Lambert diffuse
 vec3 DiffuseLambert(vec3 diffuseColor) {
     return diffuseColor / PI;
 }
 
+vec3 CorrectDirectionForEnvMap(vec3 dir) {
+    return vec3(-dir.z, dir.y, dir.x);
+}
+
 void main()
 {
-    vec3 baseColor  = texture(baseColorTexture, fUV).rgb * factors.baseColor.rgb;
-    vec3 normal  = fNormal.rgb;
-    float metallic = texture(metallicRoughnessTexture, fUV).g * factors.metallic;
-    float roughness = texture(metallicRoughnessTexture, fUV).b * factors.roughness;
-    vec3 emissive = texture(emissiveTexture, fUV).rgb * factors.emissive;
-	float ao = texture(occlusionTexture, fUV).r;
+    vec3 baseColor      = texture(baseColorTexture, fUV).rgb * factors.baseColor.rgb;
+    vec3 normal         = fNormal.rgb;
+    float metallic      = texture(metallicRoughnessTexture, fUV).g * factors.metallic;
+    float roughness     = texture(metallicRoughnessTexture, fUV).b * factors.roughness;
+    vec3 emissive       = texture(emissiveTexture, fUV).rgb * factors.emissive;
+	float ao            = texture(occlusionTexture, fUV).r;
 
     vec3 worldPos = fWorldPosition.rgb;
 
@@ -152,11 +149,11 @@ void main()
     float NdotH = clamp(dot(normal, h), 0.001, 1.0);
     float VdotH = clamp(dot(v, h), 0.001, 1.0);
 
-    vec3 dielectoricF0 = vec3(0.04); // 非金属のF0
+    vec3 dielectoricF0 = vec3(0.04); // F0 for non-metallic
     vec3 specularColor = mix(dielectoricF0, baseColor, metallic);
     vec3 diffuseColor = baseColor * (1.0 - metallic);
 
-    // フレネル項
+    // Fresnel term
     float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
     float reflectance90 = clamp(reflectance * 25.0, 0.0, 1.0);
     vec3 F0 = specularColor;
@@ -171,11 +168,11 @@ void main()
 
     vec3 direct = NdotL * light.lightColor.rgb * (diffuseTerm + specularColorTerm);
 
-    vec3 diffuseIBL = texture(irradianceMap, normal).rgb * baseColor * (1.0 - metallic);
-    vec3 prefiltered = textureLod(prefilterMap, reflection, roughness * MAX_MIP_LEVEL).rgb;
-    vec2 brdf = texture(brdfLUT, vec2(NdotV, roughness)).rg;
-    vec3 specularIBL = prefiltered * (F0 * brdf.x + brdf.y);
-    vec3 LIBL = diffuseIBL + specularIBL;
+    vec3 diffuseIBL     = texture(irradianceMap, CorrectDirectionForEnvMap(normal)).rgb * baseColor * (1.0 - metallic);
+    vec3 prefiltered    = textureLod(prefilterMap, CorrectDirectionForEnvMap(reflection), roughness * MAX_MIP_LEVEL).rgb;
+    vec2 brdf           = texture(brdfLUT, vec2(NdotV, roughness)).rg;
+    vec3 specularIBL    = prefiltered * (F0 * brdf.x + brdf.y);
+    vec3 LIBL           = diffuseIBL + specularIBL;
 
     // NOTE : Add AO
 
