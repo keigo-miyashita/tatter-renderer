@@ -15,9 +15,6 @@ sqrp::ImageHandle GuiManager::CreateIcon(std::string path)
 	}
 
 	std::vector<uint8_t> data(pixels, pixels + texWidth * texHeight * 4); // RGBA
-	/*for (int i = 0; i < texWidth * texHeight * 4; i++) {
-		data[i] = pixels[i] / 255.0f;
-	}*/
 	stbi_image_free(pixels);
 
 
@@ -67,38 +64,37 @@ void GuiManager::DefineGUIStyle()
 {
 	ImGuiStyle& style = ImGui::GetStyle();
 
-	// 全体の色を取得して変更
-	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.02f, 0.02f, 0.02f, 1.0f);   // ウィンドウ背景
-	// 通常のタイトルバー背景
-	style.Colors[ImGuiCol_TitleBg] = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); // 緑
-
-	// アクティブなウィンドウのタイトルバー背景
-	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); // 少し明るい緑
+	// Window background
+	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.02f, 0.02f, 0.02f, 1.0f);
+	// Title bar background
+	style.Colors[ImGuiCol_TitleBg] = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); // black
+	// Active title bar background
+	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); // black
 	style.Colors[ImGuiCol_Header] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
 	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
 	style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
 
-	// ボタン
-	style.Colors[ImGuiCol_Button] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);        // 通常
-	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.3f, 0.5f, 0.7f, 1.0f); // ホバー
-	style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.1f, 0.3f, 0.5f, 1.0f);  // 押下中
+	// Button
+	style.Colors[ImGuiCol_Button] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
+	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.3f, 0.5f, 0.7f, 1.0f);
+	style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.1f, 0.3f, 0.5f, 1.0f);
 
 	// Selectable
-	style.Colors[ImGuiCol_Header] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);           // 通常
-	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.3f, 0.5f, 0.7f, 1.0f);    // ホバー
-	style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.1f, 0.3f, 0.5f, 1.0f);     // 選択中
+	style.Colors[ImGuiCol_Header] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
+	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.3f, 0.5f, 0.7f, 1.0f);
+	style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.1f, 0.3f, 0.5f, 1.0f);
 
-	// Checkbox (チェックボックス)
-	//style.Colors[ImGuiCol_CheckMark] = ImVec4(0.8f, 0.2f, 0.2f, 1.0f);       // チェックマークの色
-	style.Colors[ImGuiCol_FrameBg] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);         // 背景
-	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);  // ホバー
-	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);   // 押下中
-
-	// InputFloat3（入力欄）
+	// Checkbox
+	//style.Colors[ImGuiCol_CheckMark] = ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
 	style.Colors[ImGuiCol_FrameBg] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
 	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
 	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
-	//style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // テキスト色
+
+	// InputFloat3
+	style.Colors[ImGuiCol_FrameBg] = ImVec4(0.05859375f, 0.1015625f, 0.26953125f, 1.0f);
+	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
+	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
+	//style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 GuiManager::GuiManager(App* app)
@@ -214,7 +210,7 @@ void GuiManager::DrawGui()
 	}
 	
 	// Icons
-	ImGui::SetCursorPos(ImVec2(0, 30)); // Image 内の座標
+	ImGui::SetCursorPos(ImVec2(0, 30)); // Coordinates of Image
 	ImTextureID translateIconTexId = (ImTextureID)((VkDescriptorSet)translateIconDescSet_->GetDescriptorSet());
 	if (ImGui::ImageButton("Translate", translateIconTexId, ImVec2(32, 32))) gizmoOperation_ = ImGuizmo::TRANSLATE;
 	ImTextureID rotationIconTexId = (ImTextureID)((VkDescriptorSet)rotationIconDescSet_->GetDescriptorSet());
@@ -232,7 +228,6 @@ void GuiManager::DrawGui()
 	glm::mat4 indentityMatrix = glm::mat4(1.0f);
 	ImGuizmo::ViewManipulate(glm::value_ptr(view), 1.0f, ImVec2(sceneViewSize_.width / 6.0f * 5, sceneTitleBarHeight), ImVec2(sceneViewSize_.width / 6.0f, sceneViewSize_.height / 6.0f), 0x10101010);
 	// Using ImGui::GetWindowWidth() returns default value, (400, 400), when no resize
-	//ImVec2 gizmoPos = ImVec2(ImGui::GetWindowPos().x + sceneViewSize_.width - sceneViewSize_.width / 6.0f, ImGui::GetWindowPos().y);
 	ImVec2 gizmoPos = ImVec2(sceneViewSize_.width - sceneViewSize_.width / 6.0f, 0.0f);
 	ImVec2 gizmoSize = ImVec2(sceneViewSize_.width / 6.0f, sceneViewSize_.height / 6.0f);
 	MousePosition pushedMousePos = Input::GetPushedPos();
@@ -308,7 +303,7 @@ void GuiManager::DrawGui()
 		if (fabs(angle) < 0.01f) angle = 0.0f;
 		while (angle > 180.0f) angle -= 360.0f;
 		while (angle < -180.0f) angle += 360.0f;
-		// ±180 の境界を丸める
+		// Rounding near 180 degrees
 		if (fabs(angle - 180.0f) < 0.01f || fabs(angle + 180.0f) < 0.01f)
 			angle = 180.0f;
 		return angle;
@@ -346,7 +341,7 @@ void GuiManager::DrawGui()
 				normalizedRotation.x = NormalizeAngle(displayCameraRotation.x);
 				normalizedRotation.y = NormalizeAngle(displayCameraRotation.y);
 				normalizedRotation.z = NormalizeAngle(displayCameraRotation.z);
-				// 90度や180度付近は明示的にスナップ
+				// Snapping 90 degrees
 				auto Snap = [](float angle) {
 					if (fabs(angle - 90.0f) < 0.01f) return 89.9f;
 					if (fabs(angle + 90.0f) < 0.01f) return -89.9f;
@@ -364,8 +359,8 @@ void GuiManager::DrawGui()
 				glm::quat qPitch = glm::angleAxis(radiansRot.x, glm::vec3(1, 0, 0));
 				glm::quat qRoll = glm::angleAxis(radiansRot.z, glm::vec3(0, 0, -1));
 
-				//// 回転順序を定義（重要）
-				glm::quat q = qYaw * qPitch * qRoll; // Yaw→Pitch→Roll の順
+				//// NOTE : define the order of rotation here
+				glm::quat q = qYaw * qPitch * qRoll; // Yaw -> Pitch -> Roll
 				app_->camera_.SetRotation(q);
 			}
 		}

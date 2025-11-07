@@ -57,7 +57,7 @@ private:
 	bool isModifiedRotation_ = false;
 	int renderMode_ = 1; // 0: Forward, 1: G-Buffer
 	ImGuizmo::OPERATION gizmoOperation_ = ImGuizmo::TRANSLATE;
-	float edgeThreshold_ = 20.0f; // ÉäÉTÉCÉYñ≥å¯ïù
+	float edgeThreshold_ = 20.0f; // width regareded as edge
 	std::array<int, 9> dir_ = { -1 /*None*/, 0/*Left*/, 1/*Right*/, 2/*Up*/, 3/*Down*/, 4/*UpLeft*/, 5/*UpRight*/, 6/*DownLeft*/, 7/*DownRight*/ };
 	int catchedSceneEdge_ = -1;
 	int catchedInspectorDir_ = -1;

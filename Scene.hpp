@@ -14,7 +14,7 @@ public:
 	ModelData(sqrp::GLTFMeshHandle mesh, MaterialHandle material);
 	ModelData(const ModelData&) = delete;
 	ModelData& operator=(const ModelData&) = delete;
-	ModelData(ModelData&&) noexcept = default; // ÉÄÅ[Éuãñâ¬
+	ModelData(ModelData&&) noexcept = default; // Allow move constructor
 	ModelData& operator=(ModelData&&) noexcept = default;
 
 	void IncrementInstance();

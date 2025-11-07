@@ -49,7 +49,7 @@ Material::Material(const sqrp::Device& device, std::string modelDir, std::string
             subMaterialInfo.occlusionTexture = LoadTexture(model, texIndex, 1, vk::Format::eR8Unorm); // NOTE : Only R channel is used for occlusion
         }
         else {
-			// NOTE : dummy
+			// NOTE : dummy texture
             sqrp::ImageHandle texture = pDevice_->CreateImage(
                 "dummyAO",
                 vk::Extent3D{ static_cast<uint32_t>(1), static_cast<uint32_t>(1), 1 },
@@ -79,12 +79,6 @@ Material::Material(const sqrp::Device& device, std::string modelDir, std::string
             subMaterialInfo.emissiveTexture = LoadTexture(model, texIndex, 4, vk::Format::eR8G8B8A8Srgb); // NOTE : RGB channels are used for emissive
         }
 
-        //// ‚»‚Ì‘¼
-        //m.doubleSided = mat.doubleSided;
-        //m.alphaMode = mat.alphaMode;
-        //m.alphaCutoff = static_cast<float>(mat.alphaCutoff);
-
-        //outMaterials.push_back(m);
         subMaterialInfo.doubleSided = mat.doubleSided;
         subMaterialInfo.alphaMode = mat.alphaMode;
         subMaterialInfo.alphaCutoff = static_cast<float>(mat.alphaCutoff);
