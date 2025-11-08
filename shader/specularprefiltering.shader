@@ -3,17 +3,17 @@
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
-layout(set = 0, binding = 0) uniform samplerCube envMap;   // 元の HDR 環境マップ
-layout(set = 0, binding = 1, rgba16f) writeonly uniform imageCube prefilterMapMip0; // 出力 cubemap
-layout(set = 0, binding = 2, rgba16f) writeonly uniform imageCube prefilterMapMip1; // 出力 cubemap
-layout(set = 0, binding = 3, rgba16f) writeonly uniform imageCube prefilterMapMip2; // 出力 cubemap
-layout(set = 0, binding = 4, rgba16f) writeonly uniform imageCube prefilterMapMip3; // 出力 cubemap
-layout(set = 0, binding = 5, rgba16f) writeonly uniform imageCube prefilterMapMip4; // 出力 cubemap
-layout(set = 0, binding = 6, rgba16f) writeonly uniform imageCube prefilterMapMip5; // 出力 cubemap
-layout(set = 0, binding = 7, rgba16f) writeonly uniform imageCube prefilterMapMip6; // 出力 cubemap
-layout(set = 0, binding = 8, rgba16f) writeonly uniform imageCube prefilterMapMip7; // 出力 cubemap
-layout(set = 0, binding = 9, rgba16f) writeonly uniform imageCube prefilterMapMip8; // 出力 cubemap
-layout(set = 0, binding = 10, rgba16f) writeonly uniform imageCube prefilterMapMip9; // 出力 cubemap
+layout(set = 0, binding = 0) uniform samplerCube envMap; 
+layout(set = 0, binding = 1, rgba16f) writeonly uniform imageCube prefilterMapMip0;
+layout(set = 0, binding = 2, rgba16f) writeonly uniform imageCube prefilterMapMip1;
+layout(set = 0, binding = 3, rgba16f) writeonly uniform imageCube prefilterMapMip2;
+layout(set = 0, binding = 4, rgba16f) writeonly uniform imageCube prefilterMapMip3;
+layout(set = 0, binding = 5, rgba16f) writeonly uniform imageCube prefilterMapMip4;
+layout(set = 0, binding = 6, rgba16f) writeonly uniform imageCube prefilterMapMip5;
+layout(set = 0, binding = 7, rgba16f) writeonly uniform imageCube prefilterMapMip6;
+layout(set = 0, binding = 8, rgba16f) writeonly uniform imageCube prefilterMapMip7;
+layout(set = 0, binding = 9, rgba16f) writeonly uniform imageCube prefilterMapMip8;
+layout(set = 0, binding = 10, rgba16f) writeonly uniform imageCube prefilterMapMip9;
 
 layout(push_constant) uniform Push
 {
@@ -61,23 +61,38 @@ vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness) {
     return sampleVec;
 }
 
+vec3 GetDirection(int face, vec2 uv)
+{
+    // Coordinates of each face (0, 0, 0)
+    // so each face goes from -1 to +1 in both u and v
+    uv = uv * 2.0 - 1.0; // [0,1] → [-1,1]
+    vec3 dir = vec3(0.0);
+
+    // +X (when +x is max)
+         if (face == 0)     dir = normalize(vec3( 1.0,  -uv.y, -uv.x));
+    // -X (when -x is max)
+    else if (face == 1)     dir = normalize(vec3(-1.0,  -uv.y,  uv.x));
+    // +Y (when +y is max)
+    else if (face == 2)     dir = normalize(vec3( uv.x,   1.0, uv.y));
+    // -Y (when -y is max)
+    else if (face == 3)     dir = normalize(vec3( uv.x,  -1.0,  -uv.y));
+    // +Z (when +z is max)
+    else if (face == 4)     dir = normalize(vec3(uv.x,  -uv.y,  1.0));
+    // -Z (when -z is max)
+    else if (face == 5)     dir = normalize(vec3(-uv.x, -uv.y,  -1.0));
+
+    return dir;
+}
+
 void main() {
     ivec2 id = ivec2(gl_GlobalInvocationID.xy);
     if(id.x >= push.size || id.y >= push.size) return;
 
-    // face 内の uv [-1,1]
     vec2 uv = (vec2(id) + 0.5) / float(push.size);
-    vec2 a = uv * 2.0 - 1.0;
+    uv = uv * 2.0 - 1.0;
 
-    // cubemap face から正規化された方向 N を求める
     vec3 N;
-    if (push.face == 0)       N = normalize(vec3( 1.0,  -a.y, -a.x)); // +X (when +x is max)
-    else if (push.face == 1)  N = normalize(vec3(-1.0,  -a.y,  a.x)); // -X (when -x is max)
-    else if (push.face == 2)  N = normalize(vec3( a.x,   1.0, a.y)); // +Y (when +y is max)
-    else if (push.face == 3)  N = normalize(vec3( a.x,  -1.0,  -a.y)); // -Y (when -y is max)
-    else if (push.face == 4)  N = normalize(vec3(a.x,  -a.y,  1.0)); // +Z (when +z is max)
-    else if (push.face == 5)  N = normalize(vec3(-a.x, -a.y,  -1.0)); // -Z (when -z is max)
-
+    N = GetDirection(push.face, uv);
     vec3 R = N;
     vec3 V = R; // assume normal aligned view vector for prefilter
 
@@ -132,6 +147,5 @@ void main() {
             imageStore(prefilterMapMip9, ivec3(id, push.face), vec4(prefilteredColor, 1.0));
             break;
     }
-    // imageStore(prefilterMap, ivec3(id, push.face), vec4(prefilteredColor, 1.0));
 }
 #endif

@@ -41,41 +41,50 @@ vec3 SampleHemisphereCosine(vec2 xi) {
 void BuildTangents(vec3 N, out vec3 T, out vec3 B) {
     vec3 up = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
     T = normalize(cross(up, N));
-    B = normalize(cross(T, N)); // NOTE : left handed
+    B = normalize(cross(N, T)); // right handed
+}
+
+vec3 GetDirection(int face, vec2 uv)
+{
+    // Coordinates of each face (0, 0, 0)
+    // so each face goes from -1 to +1 in both u and v
+    uv = uv * 2.0 - 1.0; // [0,1] → [-1,1]
+    vec3 dir = vec3(0.0);
+
+    // +X (when +x is max)
+         if (face == 0)     dir = normalize(vec3( 1.0,  -uv.y, -uv.x));
+    // -X (when -x is max)
+    else if (face == 1)     dir = normalize(vec3(-1.0,  -uv.y,  uv.x));
+    // +Y (when +y is max)
+    else if (face == 2)     dir = normalize(vec3( uv.x,   1.0, uv.y));
+    // -Y (when -y is max)
+    else if (face == 3)     dir = normalize(vec3( uv.x,  -1.0,  -uv.y));
+    // +Z (when +z is max)
+    else if (face == 4)     dir = normalize(vec3(uv.x,  -uv.y,  1.0));
+    // -Z (when -z is max)
+    else if (face == 5)     dir = normalize(vec3(-uv.x, -uv.y,  -1.0));
+
+    return dir;
 }
 
 void main() {
     ivec2 id = ivec2(gl_GlobalInvocationID.xy);
     if (id.x >= push.size || id.y >= push.size) return;
 
-    // compute uv in [-1,1] for the face
     vec2 uv = (vec2(id) + 0.5) / float(push.size); // [0,1]
-    vec2 a = uv * 2.0 - 1.0; // [-1,1]
+    uv = uv * 2.0 - 1.0; // [-1,1]
 
-    // compute normal direction for this face (right-hand coord assumed)
-    vec3 N;
-    if (push.face == 0)       N = normalize(vec3( 1.0,  -a.y, -a.x)); // +X (when +x is max)
-    else if (push.face == 1)  N = normalize(vec3(-1.0,  -a.y,  a.x)); // -X (when -x is max)
-    else if (push.face == 2)  N = normalize(vec3( a.x,   1.0, a.y)); // +Y (when +y is max)
-    else if (push.face == 3)  N = normalize(vec3( a.x,  -1.0,  -a.y)); // -Y (when -y is max)
-    else if (push.face == 4)  N = normalize(vec3(a.x,  -a.y,  1.0)); // +Z (when +z is max)
-    else if (push.face == 5)  N = normalize(vec3(-a.x, -a.y,  -1.0)); // -Z (when -z is max)
-    // if (f == 0) N = normalize(vec3( 1.0,  a.y, -a.x)); // +X
-    // else if (f == 1) N = normalize(vec3(-1.0,  a.y,  a.x)); // -X
-    // else if (f == 2) N = normalize(vec3( a.x,  1.0,  a.y)); // +Y
-    // else if (f == 3) N = normalize(vec3( a.x, -1.0, -a.y)); // -Y
-    // else if (f == 4) N = normalize(vec3( a.x,  a.y,  1.0)); // +Z
-    // else /*5*/  N = normalize(vec3(-a.x,  a.y, -1.0)); // -Z
-
+    // compute normal direction for this face
+    vec3 N, T, B;
+    N = GetDirection(push.face, uv);
     // build tangent space
-    vec3 T, B;
     BuildTangents(N, T, B);
 
     vec3 accum = vec3(0.0);
     uint Nsamples = uint(push.sampleCount);
     for (uint i = 0u; i < Nsamples; ++i) {
         vec2 xi = Hammersley(i, Nsamples);
-        vec3 local = SampleHemisphereCosine(xi); // (x,y,z) where z = cosθ
+        vec3 local = SampleHemisphereCosine(xi); // (x,y,z) where z = cos(theta)
         // world sample
         vec3 sampleDir = normalize(local.x * T + local.y * B + local.z * N);
 
@@ -84,10 +93,9 @@ void main() {
         accum += Li;
     }
 
-    // Monte-Carlo: E(N) ≈ π * mean(Li) when using cosine-weighted sampling
+    // E(N) = PI * mean(Li) when using cosine-weighted sampling
     vec3 irradiance = accum * (PI / float(Nsamples));
 
-    // write to cube face texel (coords: x,y,face)
     imageStore(irradianceMap, ivec3(id, push.face), vec4(irradiance, 1.0));
 }
 #endif

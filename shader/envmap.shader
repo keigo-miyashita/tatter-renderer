@@ -27,20 +27,6 @@ vec3 GetDirection(int face, vec2 uv)
     uv = uv * 2.0 - 1.0; // [0,1] Å® [-1,1]
     vec3 dir = vec3(0.0);
 
-    // if (face == 0)       dir = normalize(vec3( 1.0,   uv.y,  uv.x)); // +X
-    // else if (face == 1)  dir = normalize(vec3(-1.0,   uv.y, -uv.x)); // -X
-    // else if (face == 2)  dir = normalize(vec3( uv.x,  -1.0,  -uv.y)); // +Y
-    // else if (face == 3)  dir = normalize(vec3( uv.x,  1.0,   uv.y)); // -Y
-    // else if (face == 4)  dir = normalize(vec3(uv.x,   uv.y, -1.0)); // +Z
-    // else if (face == 5)  dir = normalize(vec3(-uv.x,  uv.y,  1.0)); // -Z
-
-    // if (face == 5)       dir = normalize(vec3( 1.0,   uv.y,  uv.x)); // (front) +X
-    // else if (face == 4)  dir = normalize(vec3(-1.0,   uv.y, -uv.x)); // (back) -X
-    // else if (face == 2)  dir = normalize(vec3( uv.x,  -1.0,  -uv.y)); // +Y
-    // else if (face == 3)  dir = normalize(vec3( uv.x,  1.0,   uv.y)); // -Y
-    // else if (face == 0)  dir = normalize(vec3(uv.x,   uv.y, -1.0)); // +Z
-    // else if (face == 1)  dir = normalize(vec3(-uv.x,  uv.y,  1.0)); // -Z
-
     // +X (when +x is max)
          if (face == 0)     dir = normalize(vec3( 1.0,  -uv.y, -uv.x));
     // -X (when -x is max)

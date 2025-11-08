@@ -95,21 +95,20 @@ vec3 ReconstructWorldPosition(vec2 uv, float depth)
 // F0 + (F90 - F0) * (1 - cosTheta)^5
 vec3 FresnelSchlick(float cosTheta, vec3 F0, vec3 F90) {
     float powTerm = pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-    return mix(F0, F90, powTerm);
+    return F0 + (F90 - F0) * powTerm;
 }
 
 // D: GGX / Trowbridge-Reitz
-float DistributionGGX(float NdotH, float alphaRoughness) {
-    float a = alphaRoughness;
+float DistributionGGX(float NdotH, float roughness) {
+    float a = roughness;
     float a2 = a * a;
     float denom = (NdotH * NdotH) * (a2 - 1.0) + 1.0;
     return a2 / (PI * denom * denom);
 }
 
-// Geometry (Smith-Schlick-GGX)
-// k = (alpha + 1)^2 / 8, G1 = NdotX / (NdotX * (1 - k) + k)
-float GeometrySmith(float NdotV, float NdotL, float alphaRoughness) {
-    float a = alphaRoughness;
+// Geometry (Smith-Schlick-GGX) model
+float GeometrySmith(float NdotV, float NdotL, float roughness) {
+    float a = roughness;
     float k = (a + 1.0) * (a + 1.0) / 8.0;
     float Gv = NdotV / (NdotV * (1.0 - k) + k);
     float Gl = NdotL / (NdotL * (1.0 - k) + k);
@@ -138,25 +137,25 @@ void main()
 
     vec3 worldPos = ReconstructWorldPosition(fragUV, depth);
 
-    vec3 v = normalize(camera.position.xyz - worldPos);
-    vec3 l = normalize(light.lightPos.xyz - worldPos);
+    vec3 v = normalize(camera.position.xyz - worldPos); // pos to camera
+    vec3 l = normalize(light.lightPos.xyz - worldPos);  // pos to light
     vec3 h = normalize(v + l);
-    vec3 reflection = reflect(-v, normal);
+    vec3 r = reflect(-v, normal);
 
     float NdotL = clamp(dot(normal, l), 0.001, 1.0);
     float NdotV = clamp(abs(dot(normal, v)), 0.001, 1.0);
     float NdotH = clamp(dot(normal, h), 0.001, 1.0);
     float VdotH = clamp(dot(v, h), 0.001, 1.0);
 
-    vec3 dielectoricF0 = vec3(0.04); // F0 for non-metallic
-    vec3 specularColor = mix(dielectoricF0, baseColor, metallic);
+    // if metallic = 0 -> 0.04, metallic = 1 -> baseColor
+    vec3 specularColor = mix(vec3(0.04), baseColor, metallic);
     vec3 diffuseColor = baseColor * (1.0 - metallic);
 
     // Fresnel term
     float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
-    float reflectance90 = clamp(reflectance * 25.0, 0.0, 1.0);
+    // float reflectance90 = clamp(reflectance * 25.0, 0.0, 1.0);
     vec3 F0 = specularColor;
-    vec3 F90 = vec3(reflectance90);
+    vec3 F90 = vec3(1.0f); // Fixed value based on glTF Sample viewer
 
     vec3  F = FresnelSchlick(VdotH, F0, F90);
     float D = DistributionGGX(NdotH, roughness);
@@ -167,10 +166,12 @@ void main()
 
     vec3 direct = NdotL * light.lightColor.rgb * (diffuseTerm + specularColorTerm);
 
-    vec3 diffuseIBL     = texture(irradianceMap, CorrectDirectionForEnvMap(normal)).rgb * baseColor * (1.0 - metallic);
-    vec3 prefiltered    = textureLod(prefilterMap, CorrectDirectionForEnvMap(reflection), roughness * MAX_MIP_LEVEL).rgb;
+    // vec3 diffuseIBL     = texture(irradianceMap, CorrectDirectionForEnvMap(normal)).rgb * baseColor * (1.0 - metallic);
+     vec3 diffuseIBL     = texture(irradianceMap, CorrectDirectionForEnvMap(normal)).rgb * baseColor;
+    vec3 prefiltered    = textureLod(prefilterMap, CorrectDirectionForEnvMap(r), roughness * MAX_MIP_LEVEL).rgb;
     vec2 brdf           = texture(brdfLUT, vec2(NdotV, roughness)).rg;
-    vec3 specularIBL    = prefiltered * (F0 * brdf.x + brdf.y);
+    // vec3 specularIBL    = prefiltered * (F0 * brdf.x + brdf.y);
+    vec3 specularIBL    = prefiltered * (F * brdf.x + brdf.y);
     vec3 LIBL           = diffuseIBL + specularIBL;
 
     // NOTE : Add AO
