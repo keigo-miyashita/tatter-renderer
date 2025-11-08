@@ -68,7 +68,8 @@ void main()
 	mat3 TBN = mat3(tangent, bitangent, normal);
 
 	vec3 normalMap = texture(normalTexture, vUV).xyz * 2.0 - 1.0;
-	fNormal = vec4(normalize(TBN * normalMap), 0.0);  
+	fNormal = vec4(normalize(TBN * normalMap), 0.0);
+	fNormal = vec4(normal, 0.0); // NOTE : Unable normal map
 
 	fUV = vUV;
 

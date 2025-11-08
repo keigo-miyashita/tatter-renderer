@@ -80,6 +80,7 @@ void main()
 
 	vec3 normalMap = texture(normalTexture, vUV).xyz * 2.0 - 1.0;
 	fNormal = vec4(normalize(TBN * normalMap), 0.0);  
+	fNormal = vec4(normal, 0.0);  // NOTE : Unable normal map
 
 	fUV = vUV;
 
@@ -186,5 +187,9 @@ void main()
 
     outColor = vec4(direct + emissive + LIBL, 1.0);
     // outColor = vec4(worldPos, 1.0);
+    // outColor = vec4(normal * 0.5 + 0.5, 1.0f);
+    // outColor = vec4(abs(dot(normal, v)),abs(dot(normal, v)),abs(dot(normal, v)), 1.0f);
+    // outColor = vec4(v, 1.0f);
+    // outColor = vec4(fNormal.rgb * 0.5 + 0.5, 1.0f);
 }
 #endif

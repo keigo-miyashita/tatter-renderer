@@ -176,6 +176,5 @@ void main()
     // NOTE : Add AO
 
     outColor = vec4(direct + emissive + LIBL, 1.0);
-    // outColor = vec4(worldPos, 1.0);
 }
 #endif
