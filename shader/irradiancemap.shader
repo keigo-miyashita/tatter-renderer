@@ -15,6 +15,7 @@ layout(push_constant) uniform Push
 const float PI = 3.14159265359;
 
 // Hammersley sequence for quasi-random stratification
+// return float in 0 - 1
 float RadicalInverse_VdC(uint bits) {
     bits = (bits << 16u) | (bits >> 16u);
     bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
@@ -23,6 +24,8 @@ float RadicalInverse_VdC(uint bits) {
     bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
     return float(bits) * 2.3283064365386963e-10; // /2^32
 }
+
+// return vec2 in [0,1]
 vec2 Hammersley(uint i, uint N){
     return vec2(float(i)/float(N), RadicalInverse_VdC(i));
 }
@@ -88,12 +91,11 @@ void main() {
         // world sample
         vec3 sampleDir = normalize(local.x * T + local.y * B + local.z * N);
 
-        // sample environment (assume samplerCube envMap)
         vec3 Li = texture(envMap, sampleDir).rgb;
         accum += Li;
     }
 
-    // E(N) = PI * mean(Li) when using cosine-weighted sampling
+    // E(N) = Sum / N / (pdf) = Sum / N / (cos(theta) / PI) = (Sum * PI) / (N * cos(theta))
     vec3 irradiance = accum * (PI / float(Nsamples));
 
     imageStore(irradianceMap, ivec3(id, push.face), vec4(irradiance, 1.0));
