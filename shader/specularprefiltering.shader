@@ -40,24 +40,24 @@ vec2 Hammersley(uint i, uint N){
 }
 
 // GGX importance sampling
-vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness) {
+vec3 ImportanceSampleGGX(vec2 xi, vec3 N, float roughness) {
     float a = roughness * roughness;
 
-    float phi = 2.0 * PI * Xi.y;
-    float cosTheta = sqrt((1.0 - Xi.x) / (1.0 + (a*a - 1.0) * Xi.x));
-    float sinTheta = sqrt(1.0 - cosTheta*cosTheta);
+    float phi = 2.0 * PI * xi.y;
+    float cosTheta = sqrt((1.0 - xi.x) / (1.0 + (a * a - 1.0) * xi.x));
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
 
-    vec3 H;
-    H.x = cos(phi) * sinTheta;
-    H.y = sin(phi) * sinTheta;
-    H.z = cosTheta;
+    vec3 h;
+    h.x = cos(phi) * sinTheta;
+    h.y = sin(phi) * sinTheta;
+    h.z = cosTheta;
 
     // tangent space -> world space
     vec3 up = abs(N.z) < 0.999 ? vec3(0,0,1) : vec3(1,0,0);
     vec3 T = normalize(cross(up, N));
     vec3 B = cross(N, T);
 
-    vec3 sampleVec = normalize(T * H.x + B * H.y + N * H.z);
+    vec3 sampleVec = normalize(T * h.x + B * h.y + N * h.z);
     return sampleVec;
 }
 
@@ -91,22 +91,22 @@ void main() {
     vec2 uv = (vec2(id) + 0.5) / float(push.size);
     uv = uv * 2.0 - 1.0;
 
-    vec3 N;
-    N = GetDirection(push.face, uv);
-    vec3 R = N;
-    vec3 V = R; // assume normal aligned view vector for prefilter
+    vec3 n;
+    n = GetDirection(push.face, uv);
+    vec3 r = n;
+    vec3 v = r; // assume normal aligned view vector for prefilter
 
     vec3 prefilteredColor = vec3(0.0);
     float totalWeight = 0.0;
-    for(uint i=0u;i<uint(push.sampleCount);i++){
-        vec2 Xi = Hammersley(i,uint(push.sampleCount));
-        vec3 H = ImportanceSampleGGX(Xi, N, push.roughness);
-        vec3 L = normalize(2.0 * dot(V,H) * H - V);
+    for(int i = 0;i < int(push.sampleCount); i++){
+        vec2 xi = Hammersley(i,uint(push.sampleCount));
+        vec3 h = ImportanceSampleGGX(xi, n, push.roughness);
+        vec3 l = normalize(2.0 * dot(v,h) * h - v); // light dir
 
-        float NdotL = max(dot(N,L),0.0);
+        float NdotL = max(dot(n,l),0.0);
         if(NdotL > 0.0){
-            vec3 sampleColor = texture(envMap,L).rgb;
-            prefilteredColor += sampleColor * NdotL;
+            vec3 sampleColor = texture(envMap,l).rgb;
+            prefilteredColor += sampleColor * NdotL; // weight by NdotL reference (Real Shading in Unreal Engine 4)
             totalWeight += NdotL;
         }
     }

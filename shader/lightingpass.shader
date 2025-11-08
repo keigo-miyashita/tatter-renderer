@@ -93,6 +93,7 @@ vec3 ReconstructWorldPosition(vec2 uv, float depth)
 
 // Fresnel: Schlick approximation
 // F0 + (F90 - F0) * (1 - cosTheta)^5
+// NOTE : F90 is usually vec3(1.0)
 vec3 FresnelSchlick(float cosTheta, vec3 F0, vec3 F90) {
     float powTerm = pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
     return F0 + (F90 - F0) * powTerm;
@@ -167,11 +168,11 @@ void main()
     vec3 direct = NdotL * light.lightColor.rgb * (diffuseTerm + specularColorTerm);
 
     // vec3 diffuseIBL     = texture(irradianceMap, CorrectDirectionForEnvMap(normal)).rgb * baseColor * (1.0 - metallic);
-     vec3 diffuseIBL     = texture(irradianceMap, CorrectDirectionForEnvMap(normal)).rgb * baseColor;
+    vec3 diffuseIBL     = texture(irradianceMap, CorrectDirectionForEnvMap(normal)).rgb * baseColor;
     vec3 prefiltered    = textureLod(prefilterMap, CorrectDirectionForEnvMap(r), roughness * MAX_MIP_LEVEL).rgb;
     vec2 brdf           = texture(brdfLUT, vec2(NdotV, roughness)).rg;
-    // vec3 specularIBL    = prefiltered * (F0 * brdf.x + brdf.y);
-    vec3 specularIBL    = prefiltered * (F * brdf.x + brdf.y);
+    vec3 specularIBL    = prefiltered * (F0 * brdf.x + brdf.y);
+    // vec3 specularIBL    = prefiltered * (F * brdf.x + brdf.y);
     vec3 LIBL           = diffuseIBL + specularIBL;
 
     // NOTE : Add AO

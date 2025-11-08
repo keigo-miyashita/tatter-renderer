@@ -180,8 +180,8 @@ void main()
     vec3 diffuseIBL     = texture(irradianceMap, CorrectDirectionForEnvMap(normal)).rgb * baseColor;
     vec3 prefiltered    = textureLod(prefilterMap, CorrectDirectionForEnvMap(r), roughness * MAX_MIP_LEVEL).rgb;
     vec2 brdf           = texture(brdfLUT, vec2(NdotV, roughness)).rg;
-    // vec3 specularIBL    = prefiltered * (F0 * brdf.x + brdf.y);
-    vec3 specularIBL    = prefiltered * (F * brdf.x + brdf.y);
+    vec3 specularIBL    = prefiltered * (F0 * brdf.x + brdf.y);
+    // vec3 specularIBL    = prefiltered * (F * brdf.x + brdf.y);
     vec3 LIBL           = diffuseIBL + specularIBL;
 
     // NOTE : Add AO
