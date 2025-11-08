@@ -59,7 +59,7 @@ layout(location = 3) out vec2 fUV;
 void main()
 {
 	mat4 modelMat = object.model * factors.gltfModel;
-	mat3 invTransMat = transpose(inverse(mat3(object.ITModel * factors.gltfITModel)));
+	mat3 invTransMat = transpose(inverse(mat3(object.model * factors.gltfModel)));
 	fWorldPosition = modelMat * vPosition;
 	vec3 normal = normalize(invTransMat * vNormal.rgb).rgb;
 	vec3 tangent = normalize(mat3(modelMat) * vTangent.rgb).rgb;

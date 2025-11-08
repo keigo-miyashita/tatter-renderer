@@ -65,11 +65,12 @@ layout(location = 0) out vec4 fWorldPosition;
 layout(location = 1) out vec4 fNormal;
 layout(location = 2) out vec4 fTangent;
 layout(location = 3) out vec2 fUV;
+layout(location = 4) out vec4 glPosition; // debug
 
 void main()
 {
     mat4 modelMat = object.model * factors.gltfModel;
-	mat3 invTransMat = transpose(inverse(mat3(object.ITModel * factors.gltfITModel)));
+	mat3 invTransMat = transpose(inverse(mat3(object.model * factors.gltfModel)));
 	fWorldPosition = modelMat * vPosition;
 	vec3 normal = normalize(mat3(invTransMat) * vNormal.rgb).rgb;
 	vec3 tangent = normalize(mat3(modelMat) * vTangent.rgb).rgb;
@@ -83,6 +84,7 @@ void main()
 	fUV = vUV;
 
 	gl_Position = camera.proj * camera.view * fWorldPosition;
+    glPosition = gl_Position; // debug
 }
 #endif
 
@@ -91,8 +93,14 @@ layout(location = 0) in vec4 fWorldPosition;
 layout(location = 1) in vec4 fNormal;
 layout(location = 2) in vec4 fTangent;
 layout(location = 3) in vec2 fUV;
+layout(location = 4) in vec4 glPosition; // debug
 
 layout(location = 0) out vec4 outColor;   // Base Color + Metalness
+
+float LinearizeDepth(float depth, float nearZ, float farZ)
+{
+    return (nearZ * farZ) / (farZ - depth * (farZ - nearZ));
+}
 
 // Fresnel: Schlick approximation
 // F0 + (F90 - F0) * (1 - cosTheta)^5
@@ -177,5 +185,6 @@ void main()
     // NOTE : Add AO
 
     outColor = vec4(direct + emissive + LIBL, 1.0);
+    // outColor = vec4(worldPos, 1.0);
 }
 #endif
