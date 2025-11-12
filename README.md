@@ -21,9 +21,9 @@ Tatter Renderer is a real-time physically based renderer build with Vulkan.
 
 
 ## In progress
-- [] Linux support
-- [] Android support
-- [] Ray tracing
+- Linux support
+- Android support
+- Ray tracing
 
 ## Build
 ```bash
