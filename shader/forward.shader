@@ -187,10 +187,5 @@ void main()
     // NOTE : Add AO
 
     outColor = vec4(direct + emissive + LIBL, 1.0);
-    // outColor = vec4(worldPos, 1.0);
-    // outColor = vec4(normal * 0.5 + 0.5, 1.0f);
-    // outColor = vec4(abs(dot(normal, v)),abs(dot(normal, v)),abs(dot(normal, v)), 1.0f);
-    // outColor = vec4(v, 1.0f);
-    // outColor = vec4(fNormal.rgb * 0.5 + 0.5, 1.0f);
 }
 #endif

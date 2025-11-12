@@ -328,7 +328,7 @@ void GuiManager::DrawGui()
 
 		if (ImGui::Selectable("Forward", renderMode_ == 0, 0, ImVec2(inspectorViewSize_.changedWidth / 3, 0))) renderMode_ = 0;
 		ImGui::SameLine();
-		if (ImGui::Selectable("Differed", renderMode_ == 1, 0, ImVec2(inspectorViewSize_.changedWidth / 3, 0)))    renderMode_ = 1;
+		if (ImGui::Selectable("Deferred", renderMode_ == 1, 0, ImVec2(inspectorViewSize_.changedWidth / 3, 0)))    renderMode_ = 1;
 
 		ImGui::EndChild();
 	}
