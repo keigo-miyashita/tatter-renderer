@@ -134,7 +134,7 @@ void App::Recreate()
 			geomDescriptorSets_[objectName][meshID].resize(primitiveNum);
 			lightDescriptorSets_[objectName][meshID].resize(primitiveNum);
 			for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
-				int materialIndex = mesh->GetMaterialIndex(primitiveID);
+				int materialIndex = mesh->GetMaterialIndex(meshID, primitiveID);
 				forwardDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
 				geomDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
 				lightDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
@@ -687,7 +687,7 @@ void App::OnStart()
 	prefilterCompShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "specularprefiltering.shader", sqrp::ShaderType::Compute);
 	brdfLUTCompShader_ = device_.CreateShader(compiler_, string(SHADER_DIR) + "brdfLUT.shader", sqrp::ShaderType::Compute);
 
-	EnvironmentMapHandle envMap = std::make_shared<EnvironmentMap>(device_, string(HDR_DIR), "warm_restaurant_4k.hdr", envMapCompShader_, irradianceCompShader_, prefilterCompShader_, brdfLUTCompShader_);
+	EnvironmentMapHandle envMap = std::make_shared<EnvironmentMap>(device_, string(HDR_DIR) + "warm_restaurant_4k.hdr", envMapCompShader_, irradianceCompShader_, prefilterCompShader_, brdfLUTCompShader_);
 	envMaps_.insert({ envMap->GetName(), envMap });
 	envMapNames_.push_back(envMap->GetName());
 	guiManager_ = std::make_shared<GuiManager>(this);
@@ -708,7 +708,7 @@ void App::OnStart()
 			geomDescriptorSets_[objectName][meshID].resize(primitiveNum);
 			lightDescriptorSets_[objectName][meshID].resize(primitiveNum);
 			for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
-				int materialIndex = mesh->GetMaterialIndex(primitiveID);
+				int materialIndex = mesh->GetMaterialIndex(meshID, primitiveID);
 				forwardDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
 				geomDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
 				lightDescriptorSets_[objectName][meshID][primitiveID].resize(swapchain_->GetInflightCount());
@@ -864,20 +864,20 @@ void App::OnUpdate()
 		NFD::UniquePath outPath;
 
 		// prepare filters for the dialog
-		nfdfilteritem_t filterItem[2] = { {"glTF file", "gltf"}, {"hdr file", "hdr"} };
+		nfdfilteritem_t filterItem[1] = { {"glTF / hdr", "gltf,hdr"} };
 
 		// show the dialog
-		nfdresult_t result = NFD::OpenDialog(outPath, filterItem, 2);
+		nfdresult_t result = NFD::OpenDialog(outPath, filterItem, 1);
 		if (result == NFD_OKAY) {
 			std::cout << "Success!" << std::endl << outPath.get() << std::endl;
 			std::string filePath = outPath.get();
 			if (filePath.ends_with(".gltf") || filePath.ends_with(".GLTF")) {
 				std::filesystem::path pathObj(filePath);
-				newModelPath_ = pathObj.filename().string();
+				newModelPath_ = pathObj.string();
 			}
 			else if (filePath.ends_with(".hdr") || filePath.ends_with(".HDR")) {
 				std::filesystem::path pathObj(filePath);
-				newEnvMapPath_ = pathObj.filename().string();
+				newEnvMapPath_ = pathObj.string();
 			}
 			else if (result == NFD_CANCEL) {
 				std::cout << "User pressed cancel." << std::endl;
@@ -888,8 +888,8 @@ void App::OnUpdate()
 		}
 
 		if (newModelPath_ != "") {
-			GLTFMeshHandle mesh = device_.CreateGLTFMesh(string(MODEL_DIR) + newModelPath_);
-			MaterialHandle material = std::make_shared<Material>(device_, string(MODEL_DIR) + newModelPath_);
+			GLTFMeshHandle mesh = device_.CreateGLTFMesh(newModelPath_);
+			MaterialHandle material = std::make_shared<Material>(device_, newModelPath_);
 			models_.emplace(
 				mesh->GetName(),
 				std::make_shared<ModelData>(mesh, material)
@@ -897,7 +897,7 @@ void App::OnUpdate()
 		}
 
 		if (newEnvMapPath_ != "") {
-			EnvironmentMapHandle envMap = std::make_shared<EnvironmentMap>(device_, string(HDR_DIR), newEnvMapPath_, envMapCompShader_, irradianceCompShader_, prefilterCompShader_, brdfLUTCompShader_);
+			EnvironmentMapHandle envMap = std::make_shared<EnvironmentMap>(device_, newEnvMapPath_, envMapCompShader_, irradianceCompShader_, prefilterCompShader_, brdfLUTCompShader_);
 			envMaps_.insert({ envMap->GetName(), envMap });
 			envMapNames_.push_back(envMap->GetName());
 		}
@@ -933,21 +933,25 @@ void App::OnUpdate()
 		commandBuffer->SetScissor(guiManager_->GetSceneViewSize().width, guiManager_->GetSceneViewSize().height);
 		for (const auto& [objectName, objectData] : objectData_) {
 			const auto& mesh = objectData->GetPModelData()->GetMesh();
+			cout << "NumSubMeshes: " << mesh->GetSubMeshInfos().size() << endl;
 			for (const auto& subMeshinfo : mesh->GetSubMeshInfos()) {
 				sqrp::TransformMatrix mat = subMeshinfo.mat;
 				int meshID = subMeshinfo.meshIndex;
+				cout << "Drawing SubMesh: " << meshID << ", MeshName: " << mesh->GetName() << endl;
 				int primitiveNum = mesh->GetPrimitiveNumPerMesh(meshID);
 				for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
-					int materialID = mesh->GetMaterialIndex(primitiveID);
+					int materialID = mesh->GetMaterialIndex(meshID, primitiveID);
 					Factors* factors = models_.at(mesh->GetName())->GetMaterial()->GetPFactors(materialID);
 					factors->model = mat.model;
 					factors->invTransModel = mat.invTransModel;
-					int materialIndex = mesh->GetMaterialIndex(primitiveID);
+					int materialIndex = mesh->GetMaterialIndex(meshID, primitiveID);
 					commandBuffer->BindPipeline(geomPipeline_, vk::PipelineBindPoint::eGraphics); // When there are no objects, pipeline is binded
 					commandBuffer->BindDescriptorSet(geomPipeline_, geomDescriptorSets_[objectName][meshID][primitiveID][infligtIndex], vk::PipelineBindPoint::eGraphics);
 					commandBuffer->PushConstants(geomPipeline_, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, sizeof(Factors), factors);
-					commandBuffer->BindMeshBuffer(mesh, sizeof(sqrp::Vertex) * mesh->GetVertexRange(primitiveID).offset, sizeof(uint32_t) * mesh->GetIndexRange(primitiveID).offset);
-					commandBuffer->DrawMesh(mesh, mesh->GetNumIndices(primitiveID));
+					commandBuffer->BindMeshBuffer(mesh, sizeof(sqrp::Vertex) * mesh->GetVertexRange(meshID, primitiveID).offset, sizeof(uint32_t) * mesh->GetIndexRange(meshID, primitiveID).offset);
+					cout << "Drawing Mesh: " << mesh->GetName() << ", PrimitiveID: " << primitiveID << ", NumIndices: " << mesh->GetNumIndices(meshID, primitiveID) << endl;
+					cout << "Vertex Offset: " << sizeof(sqrp::Vertex) * mesh->GetVertexRange(meshID, primitiveID).offset << ", Index Offset: " << sizeof(uint32_t) * mesh->GetIndexRange(meshID, primitiveID).offset << endl;
+					commandBuffer->DrawMesh(mesh, mesh->GetNumIndices(meshID, primitiveID));
 				}
 			}
 		}
@@ -1030,16 +1034,16 @@ void App::OnUpdate()
 				int meshID = subMeshinfo.meshIndex;
 				int primitiveNum = mesh->GetPrimitiveNumPerMesh(meshID);
 				for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
-					int materialID = mesh->GetMaterialIndex(primitiveID);
+					int materialID = mesh->GetMaterialIndex(meshID, primitiveID);
 					Factors* factors = models_.at(mesh->GetName())->GetMaterial()->GetPFactors(materialID);
 					factors->model = mat.model;
 					factors->invTransModel = mat.invTransModel;
-					int materialIndex = mesh->GetMaterialIndex(primitiveID);
+					int materialIndex = mesh->GetMaterialIndex(meshID, primitiveID);
 					commandBuffer->BindPipeline(forwardPipeline_, vk::PipelineBindPoint::eGraphics);
 					commandBuffer->BindDescriptorSet(forwardPipeline_, forwardDescriptorSets_[objectName][meshID][primitiveID][infligtIndex], vk::PipelineBindPoint::eGraphics);
 					commandBuffer->PushConstants(forwardPipeline_, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, sizeof(Factors), factors);
-					commandBuffer->BindMeshBuffer(mesh, sizeof(sqrp::Vertex)* mesh->GetVertexRange(primitiveID).offset, sizeof(uint32_t)* mesh->GetIndexRange(primitiveID).offset);
-					commandBuffer->DrawMesh(mesh, mesh->GetNumIndices(primitiveID));
+					commandBuffer->BindMeshBuffer(mesh, sizeof(sqrp::Vertex)* mesh->GetVertexRange(meshID, primitiveID).offset, sizeof(uint32_t)* mesh->GetIndexRange(meshID, primitiveID).offset);
+					commandBuffer->DrawMesh(mesh, mesh->GetNumIndices(meshID, primitiveID));
 				}
 			}
 		}

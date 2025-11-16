@@ -46,6 +46,7 @@ public:
 	~Material() = default;
 
     sqrp::ImageHandle LoadTexture(const tinygltf::Model& model, int texIndex, int useChannelNum, vk::Format format);
+    sqrp::ImageHandle CreateDummyTexture(std::string name, vk::Format format, std::vector<float> initialValue);
 
     sqrp::ImageHandle GetBaseColorTexture(int materialIndex/* = 0*/) const;
     sqrp::ImageHandle GetMetallicRoughnessTexture(int materialIndex/* = 0*/) const;

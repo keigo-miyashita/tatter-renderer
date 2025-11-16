@@ -2,22 +2,22 @@
 
 using namespace std;
 
-EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std::string name, sqrp::ShaderHandle envmap, sqrp::ShaderHandle irradiance, sqrp::ShaderHandle prefilter, sqrp::ShaderHandle brdfLUT)
-    : pDevice_(&device), dir_(dir)
+EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string path, sqrp::ShaderHandle envmap, sqrp::ShaderHandle irradiance, sqrp::ShaderHandle prefilter, sqrp::ShaderHandle brdfLUT)
+    : pDevice_(&device)
 {
-	std::filesystem::path path = dir + name;
-	name_ = path.stem().string();
+	std::filesystem::path filePath = path;
+	name_ = filePath.stem().string();
 
     int w, h, c;
     //stbi_ldr_to_hdr_gamma(1.0f);
-    float* hdr = stbi_loadf((dir + name).c_str(), &w, &h, &c, 4);
+    float* hdr = stbi_loadf(path.c_str(), &w, &h, &c, 4);
 
 	width_ = w;
 	height_ = h;
     std::vector<float> data(hdr, hdr + width_ * height_ * 4); // RGBE
     stbi_image_free(hdr);
 
-	cout << "Loaded HDR image: " << name << " (" << w << "x" << h << ", channels: " << c << ")" << endl;
+	cout << "Loaded HDR image: " << path << " (" << w << "x" << h << ", channels: " << c << ")" << endl;
 
 
     stagingBuffer_ = pDevice_->CreateBuffer("envMapStaging", width_ * height_ * 4 * sizeof(float), vk::BufferUsageFlagBits::eTransferSrc, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO);
@@ -47,7 +47,7 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
         .setMinLod(0.0f)
         .setBorderColor(vk::BorderColor::eFloatOpaqueBlack);
     envTexture_ = pDevice_->CreateImage(
-        name + "Decoded",
+        name_ + "Decoded",
         envTextureImageInfo,
         vk::ImageAspectFlagBits::eColor,
         envTextureSamplerInfo
@@ -85,7 +85,7 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
 	    .setMinLod(0.0f)
 	    .setBorderColor(vk::BorderColor::eFloatOpaqueBlack);
     envMap_ = pDevice_->CreateImage(
-		name + "EnvMap",
+        name_ + "EnvMap",
         imageInfo,
 		vk::ImageAspectFlagBits::eColor,
         samplerInfo
@@ -177,7 +177,7 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
         .setMinLod(0.0f)
         .setBorderColor(vk::BorderColor::eFloatOpaqueBlack);
     irradianceMap_ = pDevice_->CreateImage(
-        name + "IrradianceMap",
+        name_ + "IrradianceMap",
         irradianceMapImageInfo,
         vk::ImageAspectFlagBits::eColor,
         irradianceMapSamplerInfo
@@ -208,7 +208,7 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
         .setMinLod(0.0f)
         .setBorderColor(vk::BorderColor::eFloatOpaqueBlack);
     prefilterMap_ = pDevice_->CreateImage(
-        name + "PrefileterMap",
+        name_ + "PrefileterMap",
         prefilterImageInfo,
         vk::ImageAspectFlagBits::eColor,
         prefilterSamplerInfo
@@ -238,7 +238,7 @@ EnvironmentMap::EnvironmentMap(const sqrp::Device& device, std::string dir, std:
         .setMinLod(0.0f)
         .setBorderColor(vk::BorderColor::eFloatOpaqueBlack);
     brdfLUT_ = pDevice_->CreateImage(
-        name + "brdfLUT",
+        name_ + "brdfLUT",
         brdfLUTImageInfo,
         vk::ImageAspectFlagBits::eColor,
         brdfLUTSamplerInfo
