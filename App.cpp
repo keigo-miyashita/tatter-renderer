@@ -838,8 +838,12 @@ void App::OnUpdate()
 		}
 
 		if (guiManager_->GetAddedModelName() != "") {
+			auto modelItr = models_.find(guiManager_->GetAddedModelName());
+			if (modelItr == models_.end()) {
+				std::cerr << "Model not found: " << guiManager_->GetAddedModelName() << std::endl;
+			}
 			std::shared_ptr<ObjectData> objData = std::make_shared<ObjectData>(
-				device_, models_.at(guiManager_->GetAddedModelName()),
+				device_, modelItr->second,
 				glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
 				glm::quat(glm::vec3(0.0f, 0.0f, 0.0f)),
 				1.0f
@@ -941,7 +945,11 @@ void App::OnUpdate()
 				int primitiveNum = mesh->GetPrimitiveNumPerMesh(meshID);
 				for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
 					int materialID = mesh->GetMaterialIndex(meshID, primitiveID);
-					Factors* factors = models_.at(mesh->GetName())->GetMaterial()->GetPFactors(materialID);
+					auto modelItr = models_.find(mesh->GetName());
+					if (modelItr == models_.end()) {
+						std::cerr << "Model not found: " << mesh->GetName() << std::endl;
+					}
+					Factors* factors = modelItr->second->GetMaterial()->GetPFactors(materialID);
 					factors->model = mat.model;
 					factors->invTransModel = mat.invTransModel;
 					int materialIndex = mesh->GetMaterialIndex(meshID, primitiveID);
@@ -1035,7 +1043,11 @@ void App::OnUpdate()
 				int primitiveNum = mesh->GetPrimitiveNumPerMesh(meshID);
 				for (int primitiveID = 0; primitiveID < mesh->GetPrimitiveNumPerMesh(meshID); primitiveID++) {
 					int materialID = mesh->GetMaterialIndex(meshID, primitiveID);
-					Factors* factors = models_.at(mesh->GetName())->GetMaterial()->GetPFactors(materialID);
+					auto modelItr = models_.find(mesh->GetName());
+					if (modelItr == models_.end()) {
+						std::cerr << "Model not found: " << mesh->GetName() << std::endl;
+					}
+					Factors* factors = modelItr->second->GetMaterial()->GetPFactors(materialID);
 					factors->model = mat.model;
 					factors->invTransModel = mat.invTransModel;
 					int materialIndex = mesh->GetMaterialIndex(meshID, primitiveID);

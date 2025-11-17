@@ -45,7 +45,18 @@ ObjectData::ObjectData(
 	model_->IncrementInstance();
 
 	objectBuffer_ = device.CreateBuffer("_object", sizeof(sqrp::TransformMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
-	//objectBuffer_->Write(object_);
+	objectBuffer_->Write(GetTransform());
+}
+
+ObjectData::ObjectData(
+	const sqrp::Device& device,
+	glm::vec4 position,
+	glm::quat quatRotation,
+	float scale
+) : position_(position), quatRotation_(quatRotation), scale_(glm::vec3(scale))
+{
+	name_ = "";
+	objectBuffer_ = device.CreateBuffer("_object", sizeof(sqrp::TransformMatrix), vk::BufferUsageFlagBits::eUniformBuffer, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST);
 	objectBuffer_->Write(GetTransform());
 }
 
@@ -65,6 +76,10 @@ void ObjectData::UpdateTransform(glm::mat4 model)
 	glm::vec4 perspective;
 	glm::quat quat;
 	glm::decompose(model, scale, quat, translation, skew, perspective);
+
+	if (scale.x < 0.01f || scale.y < 0.01f || scale.z < 0.01f) {
+		return;
+	}
 
 	position_ = glm::vec4(translation, 1.0f);
 	quatRotation_ = quat;

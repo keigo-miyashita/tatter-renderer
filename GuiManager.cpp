@@ -10,8 +10,7 @@ sqrp::ImageHandle GuiManager::CreateIcon(std::string path)
 	int texWidth = 0, texHeight = 0, texChannels = 0;
 	stbi_uc* pixels = stbi_load(path.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 	if (!pixels) {
-		fprintf(stderr, "Failed to load image %s\n", path);
-		throw std::runtime_error("Failed to load image");
+		throw std::runtime_error("Failed to load image" + path);
 	}
 
 	std::vector<uint8_t> data(pixels, pixels + texWidth * texHeight * 4); // RGBA
@@ -172,6 +171,15 @@ void GuiManager::DrawGui()
 
 	ImVec2 mouse = ImGui::GetIO().MousePos;
 
+	std::shared_ptr<ObjectData> selectedObject;
+	auto it = app_->objectData_.find(selectedObjectName_);
+	if (it == app_->objectData_.end()) {
+		selectedObject = std::make_shared<ObjectData>(app_->device_);
+	}
+	else {
+		selectedObject = it->second;
+	}
+
 	// 1. Scene View
 	ImGuiWindowFlags sceneWindowFlag = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoTitleBar & (~ImGuiWindowFlags_NoResize);
 	if (catchedSceneEdge_ & (GuiEdge::Left | GuiEdge::Up) || (catchedSceneEdge_ & (GuiEdge::Down | GuiEdge::Right)) == (GuiEdge::Down | GuiEdge::Right))
@@ -250,7 +258,7 @@ void GuiManager::DrawGui()
 	app_->camera_.SetRotation(newCameraQuatRotation);
 
 	if (app_->objectData_.size() != 0) {
-		glm::mat4 model = app_->objectData_.at(selectedObjectName_)->GetModel();
+		glm::mat4 model = selectedObject->GetModel();
 		if (isShowGuizmo_) {
 			ImGuizmo::Manipulate(
 				glm::value_ptr(view), glm::value_ptr(proj), gizmoOperation_,
@@ -260,7 +268,7 @@ void GuiManager::DrawGui()
 				Input::SetCatchInput(false);
 			}
 		}
-		app_->objectData_.at(selectedObjectName_)->UpdateTransform(model);
+		selectedObject->UpdateTransform(model);
 	}
 	ImGui::End();
 
@@ -301,9 +309,9 @@ void GuiManager::DrawGui()
 	glm::vec3 displayRotation = glm::vec3(0.0f);
 	glm::vec3 scale = glm::vec3(0.0f);
 	if (app_->objectData_.size() != 0) {
-		position = app_->objectData_.at(selectedObjectName_)->GetPosition();
-		displayRotation = glm::degrees(app_->objectData_.at(selectedObjectName_)->GetRotation());
-		scale = app_->objectData_.at(selectedObjectName_)->GetScale();
+		position = selectedObject->GetPosition();
+		displayRotation = glm::degrees(selectedObject->GetRotation());
+		scale = selectedObject->GetScale();
 	}
 	auto NormalizeAngle = [](float angle) {
 		if (fabs(angle) < 0.01f) angle = 0.0f;
@@ -394,7 +402,7 @@ void GuiManager::DrawGui()
 		ImGui::Checkbox("Show Guizmo", &isShowGuizmo_);
 		if (ImGui::InputFloat3("Position", glm::value_ptr(position))) {
 			if (app_->objectNames_.size() != 0) {
-				app_->objectData_.at(selectedObjectName_)->SetPosition(position);
+				selectedObject->SetPosition(position);
 			}
 		}
 		ImGui::InputFloat3("Rotation", glm::value_ptr(displayRotation));
@@ -405,7 +413,7 @@ void GuiManager::DrawGui()
 				normalizedRotation.x = NormalizeAngle(displayRotation.x);
 				normalizedRotation.y = NormalizeAngle(displayRotation.y);
 				normalizedRotation.z = NormalizeAngle(displayRotation.z);
-				app_->objectData_.at(selectedObjectName_)->SetRotation(glm::quat(glm::radians(normalizedRotation)));
+				selectedObject->SetRotation(glm::quat(glm::radians(normalizedRotation)));
 				isModifiedRotation_ = false;
 			}
 		}
@@ -415,8 +423,9 @@ void GuiManager::DrawGui()
 		}
 		if (ImGui::InputFloat3("Scale", glm::value_ptr(scale)))
 		{
+			scale = glm::max(scale, glm::vec3(0.01f));
 			if (app_->objectNames_.size() != 0) {
-				app_->objectData_.at(selectedObjectName_)->SetScale(scale);
+				selectedObject->SetScale(scale);
 			}
 		}
 		deletedModelName_ = "";

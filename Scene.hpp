@@ -43,6 +43,12 @@ public:
 		glm::quat quatRotation = { 0.0f, 0.0f, 0.0f, 0.0f },
 		float scale = 1.0f
 	);
+	ObjectData(
+		const sqrp::Device& device,
+		glm::vec4 position = { 0.0f, 0.0f, 0.0f, 1.0f },
+		glm::quat quatRotation = { 0.0f, 0.0f, 0.0f, 0.0f },
+		float scale = 1.0f
+	);
 	~ObjectData();
 
 	void UpdateTransform(glm::mat4 model);
